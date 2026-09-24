@@ -97,6 +97,8 @@ export WORKSHOP_USER_PASSWORD='<password of the workshop users>'
 ./print-user-urls.sh
 ----
 
+Users with different passwords: pass `--credentials-file users.csv` instead of `WORKSHOP_USER_PASSWORD` (see the "User Passwords" section of the GitOps repository's README).
+
 It installs the operators, the shared platform, the per-user resources and deploys this lab guide (image `quay.io/mostmark/inner-outer-loop-lab:latest`). Cleanup is `./cleanup.sh` in the same repository.
 
 === Build and push a container image
