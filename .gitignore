@@ -6,6 +6,8 @@ node_modules/
 
 # Ignore build output
 www/
+www-inner/
+www-outer/
 .cache/
 
 # Ignore IDE and editor files

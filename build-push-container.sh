@@ -10,6 +10,9 @@ fi
 
 IMAGE="quay.io/$QUAY_USER/inner-outer-loop-lab:latest"
 
+# Build the site variants (whole workshop, Part 1 only, Part 2 only) that the image contains
+./build-site.sh
+
 podman manifest rm "$IMAGE" 2>/dev/null || true
 podman manifest create "$IMAGE"
 podman build --platform linux/amd64,linux/arm64 --manifest "$IMAGE" .
