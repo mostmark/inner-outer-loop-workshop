@@ -1,0 +1,28 @@
+name: modules
+title: Inner & Outer Loop Workshop
+version: master
+nav:
+  - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    lab_name: "inner-outer-loop-workshop"
+    release-version: master
+    page-pagination: true
+    experimental: true
+    ocp_version: "4.22"
+    devspaces_version: "3.30"
+    pipelines_version: "1.24"
+    gitops_version: "1.21"
+    ossm_version: "3.4"
+    # OpenShift Cluster Access. The Showroom UI replaces each %token% with the URL parameter of
+    # the same name (case-insensitive). OPENSHIFT_APPS_DOMAIN is derived from
+    # OPENSHIFT_CONSOLE_URL by supplemental-ui/partials/head-scripts.hbs.
+    OPENSHIFT_CONSOLE_URL: "%openshift_console_url%"
+    OPENSHIFT_API_URL: "%openshift_api_url%"
+    OPENSHIFT_USERNAME: "%openshift_username%"
+    OPENSHIFT_PASSWORD: "%openshift_password%"
+    OPENSHIFT_APPS_DOMAIN: "%openshift_apps_domain%"
+    page-links:
+    - url: https://redhat.com
+      text: Red Hat

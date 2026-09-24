@@ -1,0 +1,102 @@
+= Deploy Web UI with Node.js and AngularJS
+include::partial$_attributes.adoc[]
+
+_10 MINUTE EXERCISE_
+
+In this lab you will learn about Node.js and will deploy the Node.js and Angular-based
+web frontend for the CoolStore online shop which uses the API Gateway services you deployed
+in previous labs.
+
+image::coolstore-arch-webui-nodejs.png[API Gateway Pattern,400,link=self,window=blank]
+
+[#what_is_nodejs]
+== What is Node.js?
+
+[sidebar]
+--
+image::nodejs-logo.png[Node.js,400,link=self,window=blank]
+
+https://nodejs.org/[Node.js^] is an open source, cross-platform runtime environment for developing server-side
+applications using JavaScript. https://nodejs.org/[Node.js^] has an event-driven architecture capable of
+non-blocking I/O. These design choices aim to optimize throughput and scalability in
+Web applications with many input/output operations, as well as for real-time web applications.
+
+https://nodejs.org/[Node.js^] non-blocking architecture allows applications to process large number of
+requests (tens of thousands) using a single thread which makes it desirable choice for building
+scalable web applications.
+--
+
+[#deploy_on_openshift]
+== Deploy on OpenShift
+
+The Web UI is built using Node.js for server-side JavaScript and AngularJS for client-side
+JavaScript. Let's deploy it on OpenShift using the certified Node.js container image available
+in OpenShift.
+
+In this lab, again you will use OpenShift https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/builds_using_buildconfig/understanding-image-builds[Source-to-Image (S2I)^].
+OpenShift will obtain the application code directly from the source repository then build and deploy a
+container image of it.
+
+For a change, rather than using the CLI option you will start this process from the web console.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], make sure your project `{DEV_PROJECT}` is selected, then `*click on the '(+)' Quick create button in the console masthead and select 'Import from Git'*`
+
+image::openshift-add-from-git.png[OpenShift - Add from Git,800,link=self,window=blank]
+
+Then, enter the following information:
+
+.Web UI Project
+[%header,cols=2*]
+|===
+|Parameter
+|Value
+
+|Git Repo URL
+|**{CODE_REPO_URL}**
+
+|Git Reference (see *advanced Git options*)
+|**{CODE_REPO_REF}**
+
+|Context Dir
+|**/labs/web-nodejs**
+
+|Builder Image
+|**Node.js**
+
+|Application
+|**coolstore**
+
+|Name
+|**web-coolstore**
+
+|Create a route to the application
+|**_Checked_**
+
+|Show advanced Routing options
+|**_Expand - see below_**
+
+|===
+
+From the advanced Routing options `*de-select the Secure Route option*`, so this creates an *HTTP* route
+like below:
+
+image::openshift-add-http-route.png[OpenShift - Add route,600,link=self,window=blank]
+
+`*Click on 'Create' button*`
+
+Now wait a few minutes for the application to be built by OpenShift and deployed to your project. In the Topology view,
+the web application is not ready until its pod is shown as *Running* (the ring around the Deployment turns dark blue).
+
+[#test_your_service]
+== Test your Service
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Open URL' icon of the Web Service*`
+
+image::openshift-web-topology.png[OpenShift - Web Topology,700,link=self,window=blank]
+
+Your browser will be redirected to **your Web Service running on OpenShift**.
+You should be able to see the CoolStore application with all products and their inventory status.
+
+image::coolstore-web.png[CoolStore Shop,840,link=self,window=blank]
+
+Well done! You are ready to move on to the next lab.

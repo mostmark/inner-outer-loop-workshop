@@ -1,0 +1,537 @@
+= Externalize Application Configuration
+include::partial$_attributes.adoc[]
+
+_15 MINUTE EXERCISE_
+
+In this lab you will learn how to manage application configuration and how to provide environment
+specific configuration to the services.
+
+[sidebar]
+.ConfigMaps
+--
+Applications require configuration in order to tweak the application behavior
+or adapt it to a certain environment without the need to write code and repackage
+the application for every change. These configurations are sometimes specific to
+the application itself such as the number of products to be displayed on a product
+page and some other times they are dependent on the environment they are deployed in
+such as the database coordinates for the application.
+
+The most common way to provide configurations to applications is using environment
+variables and external configuration files such as properties, JSON or YAML files,
+configuration files and command line arguments. These configuration artifacts
+should be externalized from the application and the container image content in
+order to keep the image portable across environments.
+
+OpenShift provides a mechanism called https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/nodes/working-with-pods#configmaps[**ConfigMaps**^]
+in order to externalize configurations
+from the applications deployed within containers and provide them to the containers
+in a unified way as files and environment variables. OpenShift also offers a way to
+provide sensitive configuration data such as certificates, credentials, etc. to the
+application containers in a secure and encrypted mechanism called Secrets.
+
+This allows developers to build the container image for their application only once,
+and reuse that image to deploy the application across various environments with
+different configurations that are provided to the application at runtime.
+--
+
+[#create_databases]
+== Create Databases for Inventory and Catalog
+
+So far Catalog and Inventory services have been using an in-memory H2 database. Although H2
+is a convenient database to run locally on your laptop, it's in no way appropriate for production or
+even integration tests. Since it's strongly recommended to use the same technology stack (operating
+system, JVM, middleware, database, etc.) that is used in production across all environments, you
+should modify Inventory and Catalog services to use PostgreSQL/MariaDB instead of the H2 in-memory database.
+
+Fortunately, OpenShift supports stateful applications such as databases which require access to
+a persistent storage that survives the container itself. You can deploy databases on OpenShift and
+regardless of what happens to the container itself, the data is safe and can be used by the next
+database container.
+
+Let's create a https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/creating-applications[MariaDB database^]
+for the **Inventory Service** using the MariaDB template that is provided for this workshop:
+
+[TIP]
+====
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/creating-applications[OpenShift Templates^] use YAML/JSON to compose
+multiple containers and their configurations as a list of objects to be created and deployed at once,
+making it simple to re-create complex deployments by just deploying a single template. Templates can
+be parameterized to get input for fields like service names and generate values for fields like passwords.
+====
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Home' menu, and choose 'Software Catalog'*`
+and then select `*Databases*` within the catalog. We will deploy 2 databases from this list.
+
+NOTE: Depending on how the web console is configured, the *Software Catalog* may instead be found as a sub-menu of the *Ecosystem* menu item
+
+image::openshift-add-database.png[OpenShift - Add database,800,link=self,window=blank]
+
+`*Select 'Coolstore MariaDB (Ephemeral)' and click on 'Instantiate Template'*`
+
+Then, enter the following information:
+
+.Inventory Database - Coolstore MariaDB (Ephemeral)
+[%header,cols=2*]
+|===
+|Parameter
+|Value
+
+|Namespace*
+|{DEV_PROJECT}
+
+|Memory Limit*
+|512Mi
+
+|Namespace
+|openshift
+
+|Database Service Name*
+|inventory-mariadb
+
+|MariaDB Connection Username*
+|inventory
+
+|MariaDB Connection Password*
+|inventory
+
+|MariaDB root Password*
+|inventoryadmin
+
+|MariaDB Database Name*
+|inventorydb
+
+|Version of MariaDB Image*
+|10.5-el9
+
+|===
+
+`*Click on 'Create' button*`, shortly a MariaDB database pod should be created:
+
+image::openshift-inventory-mariadb-topology.png[OpenShift - Inventory MariaDB,700,link=self,window=blank]
+
+Now select again from the `*'Software Catalog'*`, this time choose `*'Coolstore PostgreSQL (Ephemeral)' and click on 'Instantiate Template'*`
+to create the Catalog Database.
+
+Then, enter the following information:
+
+.Catalog Database - Coolstore PostgreSQL (Ephemeral)
+[%header,cols=2*]
+|===
+|Parameter
+|Value
+
+|Namespace*
+|{DEV_PROJECT}
+
+|Memory Limit*
+|512Mi
+
+|Namespace
+|openshift
+
+|Database Service Name*
+|catalog-postgresql
+
+|PostgreSQL Connection Username*
+|catalog
+
+|PostgreSQL Connection Password*
+|catalog
+
+|PostgreSQL Database Name*
+|catalogdb
+
+|Version of PostgreSQL Image*
+|15-el9
+
+|===
+
+`*Click on 'Create' button*`, shortly a PostgreSQL database pod should be created:
+
+image::openshift-catalog-postgresql-topology.png[OpenShift - Catalog PostgreSQL,700,link=self,window=blank]
+
+Both templates create a *Deployment*, a *Service* and a *Secret* named after the database service.
+
+Now you can move on to configure the Inventory and Catalog service to use these databases.
+
+[#give_permissions]
+== Give permissions to discover Kubernetes objects
+
+By default, due to security reasons, **containers are not allowed to snoop around OpenShift clusters and discover objects**. Security comes first and discovery is a privilege that needs to be granted to containers in each project.
+
+Since you do want our applications to discover the config maps inside the **{DEV_PROJECT}** project, you need `*to grant permission to the Service Account to access the OpenShift REST API*` and find the config maps.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*execute the following command in the terminal window*`:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc policy add-role-to-user view -n {DEV_PROJECT} -z default
+----
+
+[#externalize_quarkus_configuration]
+== Externalize Quarkus (Inventory) Configuration
+
+Quarkus supports multiple mechanisms for externalizing configurations such as environment variables,
+Maven properties, command-line arguments and more. The recommended approach for the long-term for externalizing
+configuration is however using an https://quarkus.io/guides/config-reference[application.properties^]
+which you have already packaged within the Inventory Maven project.
+
+In Quarkus, the database kind is a build time property and cannot be overridden at runtime. So as you are going to change the database
+technology, you need to change the 'quarkus.datasource.db-kind' parameter
+in **/projects/workshop/labs/inventory-quarkus/src/main/resources/application.properties** and rebuild the application.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*edit the '/projects/workshop/labs/inventory-quarkus/pom.xml' file and add the
+'Kubernetes Config' and 'JDBC Driver - MariaDB' dependencies*`
+
+[source,xml,role=copypaste]
+----
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-kubernetes-config</artifactId> #<1>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-jdbc-mariadb</artifactId> #<2>
+    </dependency>
+----
+<1> Extension which allows developers to use Kubernetes ConfigMaps and Secrets as a configuration source, without having to mount them into the Pod running the Quarkus application or make any other modifications to their Kubernetes Deployment.
+<2> Extension which allows developers to connect to MariaDB databases using the JDBC driver
+
+Then `*add the '%prod.quarkus.datasource.db-kind' parameter and the Kubernetes Config parameters in
+the '/projects/workshop/labs/inventory-quarkus/src/main/resources/application.properties' file*` as follows
+
+[source,properties,role=copypaste]
+----
+%prod.quarkus.datasource.db-kind=mariadb#<1>
+%prod.quarkus.kubernetes-config.enabled=true#<2>
+%prod.quarkus.kubernetes-config.config-maps=inventory#<3>
+%prod.quarkus.datasource.db-version=10.5
+----
+<1> The kind of database we will connect to
+<2> If set to true, the application will attempt to look up the configuration from the API server
+<3> ConfigMaps to look for in the namespace that the Kubernetes Client has been configured for
+
+NOTE: With the **%prod** prefix, this option is only activated when building the jar intended for deployments.
+
+[WARNING]
+====
+Leave the **'quarkus.datasource.jdbc.url'**, **'quarkus.datasource.username'** and **'quarkus.datasource.password'**
+parameters unchanged. They will be overridden later.
+====
+
+Now, let's create the Quarkus configuration content using the database credentials.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the `*Workloads*` menu
+`*click on 'ConfigMaps' then click on the 'Create ConfigMap' button*`.
+
+image::openshift-create-configmap.png[Che - OpenShift Create Config Map,900,link=self,window=blank]
+
+Then switch to `*YAML view*` and `*replace the content*` with the following input:
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory
+  namespace: {DEV_PROJECT}
+  labels:
+    app: coolstore
+    app.kubernetes.io/instance: inventory
+data:
+  application.properties: |-
+    quarkus.datasource.jdbc.url=jdbc:mariadb://inventory-mariadb.{DEV_PROJECT}.svc:3306/inventorydb
+    quarkus.datasource.username=inventory
+    quarkus.datasource.password=inventory
+----
+
+`*Click on the 'Create' button*`.
+
+[#rebuild_inventory]
+== Re-build Inventory Component
+
+Once the source code is updated and the ConfigMap is created, as before `*Deploy the updated Inventory Service to the OpenShift cluster*`.
+
+In your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/inventory-quarkus
+mvn package -Dquarkus.kubernetes.deploy=true -DskipTests -Dquarkus.container-image.group=$(oc project -q) -Dquarkus.kubernetes-client.trust-certs=true
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+Wait till the build is complete then, `*Delete the Inventory Pod*` to make it start again and look for the config maps:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc delete pod -l component=inventory -n {DEV_PROJECT}
+----
+
+[#check_inventory_database]
+== Check the Inventory database is being used
+
+Now **verify that the config map is in fact injected into the container by checking if the seed data is
+loaded into the database**.
+
+`*Execute the following commands in the terminal window*`
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc rsh -n {DEV_PROJECT} deploy/inventory-mariadb
+----
+
+Once connected to the MariaDB container, `*run the following*`:
+
+[IMPORTANT]
+====
+Run this command inside the Inventory MariaDB container, after opening a remote shell to it.
+====
+
+[source,shell,role=copypaste]
+----
+mysql --user=$MYSQL_USER --password=$MYSQL_PASSWORD --host=$HOSTNAME --execute="select * from INVENTORY" $MYSQL_DATABASE
+----
+
+You should have the following output:
+
+[source,sql]
+----
++--------+----------+
+| itemId | quantity |
++--------+----------+
+| 100000 |        0 |
+| 165613 |       45 |
+| 165614 |       87 |
+| 165954 |       43 |
+| 329199 |       12 |
+| 329299 |       35 |
+| 444434 |       32 |
+| 444435 |       53 |
++--------+----------+
+----
+
+*Finally*, `*VERY IMPORTANT, exit*` *from inside the database container*:
+
+[source,shell,role=copypaste]
+----
+exit
+----
+
+You have now created a config map that holds the configuration content for Inventory and can be updated
+at anytime for example when promoting the container image between environments without needing to
+modify the Inventory container image itself.
+
+[#externalize_spring_boot_configuration]
+== Externalize Spring Boot (Catalog) Configuration
+
+You should be quite familiar with config maps by now. Spring Boot application configuration is provided
+via a properties file called **application.properties** and can be
+https://docs.spring.io/spring-boot/reference/features/external-config.html[overridden and overlaid via multiple mechanisms^].
+
+[NOTE]
+====
+Check out the default Spring Boot configuration in Catalog Maven project **catalog-spring-boot/src/main/resources/application.properties**.
+====
+
+In this lab, you will configure the **Catalog Service** which is based on Spring Boot to override the default
+configuration using an alternative **application.properties** backed by a config map.
+
+Let's create the Spring Boot configuration content using the database credentials and create the Config Map.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the `*Workloads*` menu,
+`*click on 'ConfigMaps' then click on the 'Create ConfigMap' button*`.
+
+image::openshift-create-configmap.png[Che - OpenShift Create Config Map,900,link=self,window=blank]
+
+Then switch to `*YAML view*` and `*replace the content*` with the following input:
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalog
+  namespace: {DEV_PROJECT}
+  labels:
+    app: coolstore
+    app.kubernetes.io/instance: catalog
+data:
+  application.properties: |-
+    spring.datasource.url=jdbc:postgresql://catalog-postgresql.{DEV_PROJECT}.svc:5432/catalogdb
+    spring.datasource.username=catalog
+    spring.datasource.password=catalog
+    spring.datasource.driver-class-name=org.postgresql.Driver
+    spring.jpa.hibernate.ddl-auto=create
+    spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true
+----
+
+The https://github.com/spring-cloud/spring-cloud-kubernetes[Spring Cloud Kubernetes^] plug-in implements
+the integration between Kubernetes and Spring Boot and is already added as a dependency to the Catalog Maven
+project. Using this dependency, Spring Boot would search for a config map (by default with the same name as
+the application) to use as the source of application configurations during application bootstrapping and
+if enabled, triggers hot reloading of beans or Spring context when changes are detected on the config map.
+
+`*Delete the Catalog Pod*` to make it start again and look for the config maps:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc delete pod -l component=catalog -n {DEV_PROJECT}
+----
+
+When the Catalog container is *ready* (wait at least 30 seconds), verify that the PostgreSQL database is being
+used. Check the Catalog pod logs repeatedly:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc logs deployment/catalog-coolstore -n {DEV_PROJECT} | grep hibernate.dialect
+----
+
+You should have output similar to the following:
+
+[source,shell]
+----
+... INFO 1 --- [           main] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.PostgreSQL95Dialect
+----
+
+You can also connect to the Catalog PostgreSQL database and verify that the seed data is loaded:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc rsh -n {DEV_PROJECT} deploy/catalog-postgresql
+----
+
+Once connected to the PostgreSQL container, run the following:
+
+[IMPORTANT]
+====
+Run this command inside the Catalog PostgreSQL container, after opening a remote shell to it.
+====
+
+[source,shell,role=copypaste]
+----
+psql catalogdb -U catalog -c "select item_id, name, price from product"
+----
+
+You should have the following output:
+
+[source,sql]
+----
+  item_id |              name               | price
+ ---------+---------------------------------+-------
+  100000  | Red Fedora                      | 34.99
+  329299  | Quarkus T-shirt                 |    10
+  329199  | Pronounced Kubernetes           |     9
+  165613  | Knit socks                      |  4.15
+  444434  | Red Hat Impact T-shirt          |     9
+  444435  | Quarkus twill cap               |    13
+  165614  | Quarkus H2Go water bottle       | 14.45
+  444437  | Nanobloc Universal Webcam Cover |  2.75
+  165954  | Patagonia Refugio pack 28L      |     6
+ (9 rows)
+----
+
+*Finally*, `*VERY IMPORTANT, exit*` *from inside the database container*:
+
+[source,shell,role=copypaste]
+----
+exit
+----
+
+[#explore_secrets]
+== Explore Sensitive Configuration Data
+
+[sidebar]
+.Secrets
+--
+**ConfigMaps** are a superb mechanism for externalizing application configuration while keeping
+containers independent of in which environment or on what container platform they are running.
+Nevertheless, due to their clear-text nature, they are not suitable for sensitive data like
+database credentials, SSH certificates, etc. In the current lab, we used config maps for database
+credentials to simplify the steps; however, for production environments, you should opt for a more
+secure way to handle sensitive data.
+
+Fortunately, OpenShift already provides a secure mechanism for handling sensitive data which is
+called https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/nodes/working-with-pods#nodes-pods-secrets[**Secrets**^]. Secret objects act and are used
+similarly to config maps however with the difference that they are encrypted as they travel over the wire
+and also at rest when kept on a persistent disk. Like config maps, secrets can be injected into
+containers as environment variables or files on the filesystem using a temporary file-storage
+facility (tmpfs).
+--
+
+You won't create any secrets in this lab; however, you have already created two secrets when you created
+the PostgreSQL and MariaDB databases. The Database template by default stores
+the database credentials in a secret in the project in which it's being created:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc describe secret catalog-postgresql -n {DEV_PROJECT}
+----
+
+You should have output similar to the following:
+
+[source,shell,subs="attributes+"]
+----
+Name:         catalog-postgresql
+Namespace:    {DEV_PROJECT}
+Labels:       app=catalog-postgresql
+              template=coolstore-postgresql
+              ...
+Annotations:  <none>
+
+Type:  Opaque
+
+Data
+====
+database-name:      9 bytes
+database-password:  7 bytes
+database-user:      7 bytes
+----
+
+This secret has three encrypted properties defined as **database-name**, **database-user** and **database-password** which hold
+the PostgreSQL database name, username and password values. These values are injected in the PostgreSQL container as
+environment variables and used to initialize the database.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the `*Workloads*` `*Topology*` menu,
+`*click on the '(D) catalog-postgresql' Deployment, then on its name 'catalog-postgresql' in the side panel -> 'Environment'*`. Notice the values
+from the secret are defined as environment variables on the deployment:
+
+image::config-psql-secret.png[Secrets as Env Vars,900,link=self,window=blank]
+
+[#test_your_service]
+== Test your Service (again)
+
+Having made all those changes with adding databases and the application configuration you should now
+test that the Coolstore application still works. Just like you did a couple of chapters ago you need to use the topology
+display in the web console.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^] from the `*Workloads*` `*Topology*` menu,
+`*click on the 'Open URL' icon of the Web Service*`
+
+image::openshift-web-topology.png[OpenShift - Web Topology,700,link=self,window=blank]
+
+Your browser will be redirected to **your Web Service running on OpenShift**.
+You should be able to see the CoolStore application with all products and their inventory status.
+
+image::coolstore-web.png[CoolStore Shop,840,link=self,window=blank]
+
+That's all for this lab! You are ready to move on to the next lab.

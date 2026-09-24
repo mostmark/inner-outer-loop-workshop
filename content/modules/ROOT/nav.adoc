@@ -1,0 +1,19 @@
+* xref:index.adoc[Home]
+
+.Part 1: Inner Loop
+* xref:inner-loop-01-introduction.adoc[1. Introduction]
+* xref:inner-loop-02-developer-workspace.adoc[2. Get your Developer Workspace]
+* xref:inner-loop-03-inventory-quarkus.adoc[3. Create Inventory Service with Quarkus]
+* xref:inner-loop-04-catalog-spring-boot.adoc[4. Create Catalog Service with Spring Boot]
+* xref:inner-loop-05-gateway-dotnet.adoc[5. Create Gateway Service with .NET]
+* xref:inner-loop-06-webui-deployment.adoc[6. Deploy Web UI with Node.js and AngularJS]
+* xref:inner-loop-07-app-health.adoc[7. Monitor Application Health]
+* xref:inner-loop-08-app-config.adoc[8. Externalize Application Configuration]
+
+.Part 2: Outer Loop
+* xref:outer-loop-01-introduction.adoc[1. Introduction]
+* xref:outer-loop-02-developer-workspace.adoc[2. Prepare your Developer Workspace]
+* xref:outer-loop-03-continuous-integration.adoc[3. Continuous Integration with OpenShift Pipelines]
+* xref:outer-loop-04-gitops-workflow.adoc[4. GitOps Workflow with Argo CD]
+* xref:outer-loop-05-continuous-delivery.adoc[5. Continuous Delivery with OpenShift Pipelines]
+* xref:outer-loop-06-service-mesh.adoc[6. Connect and Monitor your Application with OpenShift Service Mesh]

@@ -1,0 +1,564 @@
+= Connect and Monitor your Application with OpenShift Service Mesh
+include::partial$_attributes.adoc[]
+
+_30 MINUTE EXERCISE_
+
+In this lab you will enable monitoring and traffic management of your backend services using Service Mesh.
+
+[sidebar]
+.OpenShift Service Mesh 3
+--
+The term **Service Mesh** describes the network of microservices that make up applications in a distributed microservice architecture and the interactions between those microservices. As a service mesh grows in size and complexity, it can become harder to understand and manage.
+
+**Red Hat OpenShift Service Mesh** is a platform that provides behavioral insight and operational control over the **Service Mesh**, providing a uniform way to connect, secure, and monitor microservice applications.
+
+Based on the open source https://istio.io/[Istio^] project, **Red Hat OpenShift Service Mesh** adds a transparent layer on existing distributed applications without requiring any changes to the service code. You add Red Hat OpenShift Service Mesh support to services by deploying a special sidecar proxy throughout your environment that intercepts all network communication between microservices. You configure and manage the service mesh using the control plane features.
+
+Red Hat OpenShift Service Mesh provides an easy way to create a network of deployed services that provides discovery, load balancing, service-to-service authentication, failure recovery, metrics, and monitoring. A service mesh also provides more complex operational functionality, including A/B testing, canary releases, rate limiting, access control, and end-to-end authentication.
+
+Red Hat OpenShift Service Mesh is logically split into a data plane and a control plane:
+
+* The **data plane** is composed of a set of intelligent proxies deployed as sidecars. These proxies intercept and control all inbound and outbound network communication between microservices in the service mesh, and they collect metrics about this traffic.
+
+* The **control plane** is responsible for managing and configuring the proxies to route traffic and to enforce policies.
+
+image::servicemesh-architecture.png[Service Mesh Architecture,400,link=self,window=blank]
+
+The components that make up the data plane and the control plane are:
+
+* **Envoy proxy** - is the data plane component that intercepts all inbound and outbound traffic for all services in the service mesh. Envoy is deployed as a sidecar to the relevant service in the same pod. The proxies expose metrics that OpenShift monitoring collects and that Kiali visualizes.
+* **istiod** - is the single control plane component. It provides service discovery for the Envoy proxies and configures them at runtime with traffic management capabilities for intelligent routing (for example, A/B tests or canary deployments) and resiliency (timeouts, retries, and circuit breakers). It also issues and rotates the certificates that provide strong service-to-service and end-user authentication, so that unencrypted traffic in the service mesh can be upgraded to mutual TLS and policies can be enforced based on service identity rather than on network controls. In OpenShift Service Mesh 3, the Service Mesh operator (based on the Sail operator) deploys `istiod` from an `Istio` resource.
+
+* **Ambient Mode** - is a new way of deploying service mesh without sidecars that significantly lowers the resource costs of using the mesh. This provides a low overhead solution for zero trust networking with lightweight pod-to-pod mTLS encryption and authorization policies based on workload identities,
+with the ability to add more advanced features as required. For this workshop we will continue to use Envoy proxies, but logically the behavior is very similar.
+
+--
+
+[#what_is_kiali]
+== What is Kiali?
+
+[sidebar]
+--
+image::kiali-logo.png[Kiali,400]
+
+A Microservice Architecture breaks up the monolith into many smaller pieces that are composed together.
+Patterns to secure the communication between services like fault tolerance (via timeout, retry, circuit breaking, etc.) are needed as well as observability to be able to see where calls are going.
+
+A service mesh can now provide these services at a platform level and free the developer from those tasks.
+Routing decisions are done at the mesh level.
+
+https://kiali.io[Kiali^] works with Istio, in OpenShift or Kubernetes, to visualize the service mesh topology, to
+provide visibility into features like circuit breakers, request rates and more. It offers insights about the mesh components at different levels,
+from abstract Applications to Services and Workloads.
+--
+
+[#observability_with_kiali]
+== Observability with Kiali
+
+Kiali provides an interactive graph view of your namespace in real time, being able to display the interactions at several
+levels (applications, versions, workloads), with contextual information and charts on the selected graph node or edge.
+
+Kiali also provides a way of inspecting and configuring your service mesh.
+
+NOTE: The OpenShift Console also embeds Kiali views through the Service Mesh console plugin, but the plugin lacks some of the actions used in this lab
+(such as enabling sidecar injection or editing Istio configuration). That's why this lab uses the standalone Kiali console.
+
+`*Click on the 'Developer Observability' button below*`
+
+image::developer-observability-button.png[Developer Observability - Button,300,link={KIALI_URL},window=_blank,align=center]
+
+Then, `*click on 'Log In With OpenShift'*` and, if you are asked, `*log in as {OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD}*`.
+The first time, OpenShift asks you to authorize Kiali to access your account: `*click on 'Allow selected permissions'*`.
+
+image::kiali-login.png[Kiali - Log In,300,link=self,window=blank]
+
+[#enable_service_mesh]
+== Enabling Service Mesh for the Catalog, Inventory and Gateway Service
+
+From the *Kiali* side-bar menu `**select Workloads**` and `**select your '{STAGING_PROJECT}' namespace**` in the *Namespace* selector
+to get a Kiali view of your application components.
+Notice how some components are marked as *Missing Sidecar*, which we need to fix.
+Use the `**Type**` column to sort your *Deployments*, then `**select the (W) catalog-coolstore**` *workload*.
+
+image::kiali-workloads.png[Kiali - Select workload,800,link=self,window=blank]
+
+Once the *catalog-coolstore* workload has been selected, use the `**Actions drop-down to select 'Enable Auto Injection'**`
+
+image::kiali-workload-enable-inject.png[Kiali - Enable auto injection,800,link=self,window=blank]
+
+For about a minute the workload will be displayed with errors as the Pod restarts.
+
+Congratulations! You successfully put the Catalog Service under Service Mesh control.
+
+Now `**repeat these Kiali steps**` for the `*inventory-coolstore*` and `*gateway-coolstore*` workloads.
+
+[#check_sidecar]
+=== Checking Sidecar Configuration
+
+OpenShift Service Mesh automatically injects the sidecar into the Pod according to a specific label (`sidecar.istio.io/inject: "true"`) in the Pod template of the Deployment.
+This is what *Kiali* has just added for you. Let's check how that has changed the *Deployment*.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], `*click on the 'D inventory-coolstore' bubble -> 'D inventory-coolstore'*`
+
+image::openshift-dc-inventory-topology.png[OpenShift - Inventory Topology,700,link=self,window=blank]
+
+Then, `*click on the 'YAML' tab.*`
+
+image::openshift-enable-istio-inventory.png[OpenShift - Enable Istio Inventory,700,link=self,window=blank]
+
+Now, let's check the outcome. `*Click on the 'Pods' tab*`
+
+The previous pod has been terminated and a new one deployed with 2/2 containers in the **Ready** column as follows
+
+image::openshift-istio-inventory.png[OpenShift - Istio Inventory,700,link=self,window=blank]
+
+`*Click on 'P inventory-coolstore-xxxx', then scroll down.*`
+In the Containers section, we should have 2 running containers: **one for the application and one for the istio-proxy sidecar.**
+
+image::openshift-istio-inventory-details.png[OpenShift - Istio Inventory,900,link=self,window=blank]
+
+For the *catalog-coolstore-xxxx* and *gateway-coolstore-xxxx* pods,
+`*we should find the 2 containers as well*`.
+
+[#controlling_ingress_traffic]
+== Controlling Ingress Traffic
+
+In an OpenShift environment, the OpenShift Route is used to specify services that should be exposed outside the cluster.
+In an OpenShift Service Mesh, a better approach is to use a different configuration model, namely the **Istio Gateway**.
+
+[TIP]
+====
+**Gateway** describes a load balancer operating at the edge of the mesh receiving incoming or outgoing HTTP/TCP connections. The specification describes a set of ports that should be exposed, the type of protocol to use, SNI configuration for the load balancer, etc.
+
+**VirtualService** defines a set of traffic routing rules to apply when a host is addressed. Each routing rule defines matching criteria for traffic of a specific protocol. If the traffic is matched, then it is sent to a named destination service (or subset/version of it) defined in the registry.
+====
+
+There are two parts to deploying a Gateway. First, we create an application deployment for the ingress gateway and run it in our `{STAGING_PROJECT}` project.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], in the header bar next to (?)
+`*click on '(+)' -> 'Import YAML'*`.
+
+`*Then copy in the following content:*`
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-ingressgateway
+  namespace: {STAGING_PROJECT}
+spec:
+  type: ClusterIP
+  selector:
+    istio: ingressgateway-{OPENSHIFT_USERNAME}
+  ports:
+  - name: http2
+    port: 80
+    targetPort: 8080
+  - name: https
+    port: 443
+    targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: istio-ingressgateway
+  namespace: {STAGING_PROJECT}
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway-{OPENSHIFT_USERNAME}
+  template:
+    metadata:
+      annotations:
+        # Select the gateway injection template (rather than the default sidecar template)
+        inject.istio.io/templates: gateway
+      labels:
+        # Set a unique label for the gateway. This is required to ensure Gateways can select this workload
+        istio: ingressgateway-{OPENSHIFT_USERNAME}
+        # Enable gateway injection. If connecting to a revisioned control plane, replace with "istio.io/rev: revision-name"
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: istio-proxy
+        image: auto # The image will automatically update each time the pod starts.
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: istio-ingressgateway
+  namespace: {STAGING_PROJECT}
+spec:
+  to:
+    kind: Service
+    name: istio-ingressgateway
+    weight: 100
+  port:
+    targetPort: http2
+  wildcardPolicy: None
+----
+
+`*Click on 'Create'*`. Your ingress gateway application (Deployment, Service and Route) is now created.
+
+The next step is to tell Istio about this Gateway by configuring the Gateway object and the VirtualService, which describe the network
+relationship (in terms of ports and URLs).
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], in the header bar next to (?)
+`*click on '(+)' -> 'Import YAML'*`.
+
+`*Then copy in the following content:*`
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: ingressgateway
+  namespace: {STAGING_PROJECT}
+spec:
+  selector:
+    istio: ingressgateway-{OPENSHIFT_USERNAME}
+  servers:
+    - port:
+        number: 8080
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+----
+
+`*Click on 'Create'*`. Your Istio Gateway is now created.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], in the header bar next to (?)
+`*click on '(+)' -> 'Import YAML'*`.
+
+`*Then copy in the following content:*`
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gateway-coolstore
+  namespace: {STAGING_PROJECT}
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - ingressgateway
+  http:
+    - route:
+        - destination:
+            port:
+              number: 8080
+            host: gateway-coolstore
+----
+
+`*Then click on 'Create'*`. The VirtualService for the Gateway Service is now created.
+
+[NOTE]
+====
+There are other deployment models for the ingress gateway. In this example each user gets their own private gateway, but it is possible to use a shared
+gateway and distribute inbound traffic to the correct service according to its URL.
+====
+
+To confirm that the **Istio Gateway** is properly configured,
+`*click on link:http://istio-ingressgateway-{STAGING_PROJECT}.{OPENSHIFT_APPS_DOMAIN}/api/products[http://istio-ingressgateway-{STAGING_PROJECT}.{OPENSHIFT_APPS_DOMAIN}/api/products^]*`
+
+You should see an array of JSON output looking a little like this but with many more products:
+
+[source,json]
+----
+[{
+    "itemId": "100000",
+    "name": "Red Fedora",
+    "description": "Official Red Hat Fedora",
+    "price": 34.99,
+    "availability": {
+      "quantity": 0
+    }
+  },
+  {
+    "itemId": "329299",
+    "name": "Quarkus T-shirt",
+    "description": "This updated unisex essential fits like a well-loved favorite, featuring a crew neck, short sleeves and designed with superior combed and ring- spun cotton.",
+    "price": 10,
+    "availability": {
+      "quantity": 35
+    }
+  },
+...
+]
+----
+
+TIP: If your browser shows "Application is not available", it has probably switched the URL to *https://*.
+See xref:outer-loop-02-developer-workspace.adoc#fix_browser_url[Fix up the Browser URL,role='params-link'].
+
+[#update_webui]
+== Updating the WebUI to use the Istio Gateway
+
+Configure the WebUI Service to use the Istio Gateway instead of the OpenShift Route.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^],
+`*click on the 'D web-coolstore' bubble -> 'D web-coolstore' and go to the 'Environment' tab*`
+
+`*Click on '+ Add more', then add the following environment variable*`
+
+.Web Environment Variables
+[%header,cols="30%,70%"]
+|===
+|Key
+|Value
+
+|COOLSTORE_GW_ENDPOINT
+|pass:a[http://istio-ingressgateway-{STAGING_PROJECT}.{OPENSHIFT_APPS_DOMAIN}]
+|===
+
+image::openshift-add-web-envvars.png[OpenShift - Add Web Environment Variables,700,link=self,window=blank]
+
+`*Click on 'Save'*`. The WebUI Service will be redeployed with the new environment variable.
+
+[#testing_application]
+== Testing the application
+
+Point your browser at the link:http://web-coolstore-{STAGING_PROJECT}.{OPENSHIFT_APPS_DOMAIN}[Web UI route URL^]. You should be able to see the CoolStore with all products and their inventory status.
+
+IMPORTANT: Refresh your browser maybe 20 times to generate traffic.
+
+[#kiali_graph]
+== Using Kiali to View the Network Topology Graph
+
+In the *Kiali* side-bar menu, select the **'Traffic Graph' view** (called 'Graph' in some Kiali versions), and `*enter the following configuration*`:
+
+.Graph Settings
+[%header,cols=2*]
+|===
+|Parameter
+|Value
+
+|Namespace
+|{STAGING_PROJECT}
+
+|Graph Type
+|Versioned app graph
+
+|Display
+|'Traffic Animation' checked
+
+|Hide
+|node = unknown OR service*=PassthroughCluster
+
+|===
+
+The outcome is a graph with all the services, connected by the requests going through them.
+You can see how the services interact with each other.
+
+image::kiali-graph.png[Kiali - Graph,900,link=self,window=blank]
+
+[TIP]
+====
+Use the side panel toggle (`*show/hide>>*`) to close the side panel and make your topology chart bigger.
+====
+
+[#deploy_catalog_v2]
+== Deploy the new Catalog Service
+
+A new **Catalog Service v2** has been implemented in https://go.dev/[Go^] which uses the same business logic as the **Catalog Service v1**
+except that all product descriptions are returned in **UPPERCASE**.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], make sure your project `{STAGING_PROJECT}` is selected,
+then `*click on '(+)' and select 'Import from Git'*`
+
+image::openshift-add-from-git-catalog-go.png[OpenShift - Import from Git,800,link=self,window=blank]
+
+Then, `*enter the following information:*`
+
+.Catalog v2 Project
+[%header,cols="30%,70%"]
+|===
+|Parameter
+|Value
+
+|Git Repo URL
+|pass:a[{CODE_REPO_GIT_URL}]
+
+|Git reference (Show advanced Git options)
+|{CODE_REPO_REF}
+
+|Context dir (Show advanced Git options)
+|/labs/catalog-go
+
+|Application
+|coolstore
+
+|Name
+|catalog-coolstore-v2
+
+|Resource type
+|Deployment
+
+|Create a route
+|Checked
+
+|Show advanced Routing options
+|**_Expand - see below_**
+
+|Labels
+|app.kubernetes.io/name=golang
+
+|===
+
+From the advanced Routing options `*de-select the Secure Route option*`, so this creates an *HTTP* route
+like below:
+
+image::openshift-add-http-route.png[OpenShift - Add route,600,link=self,window=blank]
+
+OpenShift automatically detects
+that you have a *Dockerfile* based project, so `*click on the 'Create' button*` to
+start the deployment:
+
+image::openshift-add-from-docker.png[OpenShift - Add from Dockerfile,700,link=self,window=blank]
+
+Shortly you should see the additional *Go* based Catalog service appear in the topology:
+
+image::openshift-catalogv2-topology.png[OpenShift - Catalog v2 Topology,700,link=self,window=blank]
+
+[#enable_ab_testing]
+== Enabling A/B Testing
+
+[sidebar]
+.A/B Testing
+--
+https://en.wikipedia.org/wiki/A/B_testing[A/B testing^] allows running multiple versions of a functionality in parallel and using analytics of the user behavior it is possible to determine which version is the best.
+It is also possible to launch the new features only for a small set of users, to prepare the general availability of a new feature.
+--
+
+The implementation of procedures like **A/B Testing** is one of the advantages coming with OpenShift Service Mesh.
+For this lab, you want to answer the following question:
+
+**Do product descriptions written in UPPERCASE increase sales?**
+
+The only step is to define the rules to distribute the traffic between the services. A **VirtualService** defines a set of traffic routing rules
+to apply when a host is addressed. Each routing rule defines matching criteria for traffic of a specific protocol.
+If the traffic is matched, then it is sent to a named destination service (or subset/version of it) defined in the registry.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], in the header bar next to (?)
+`*click on '(+)' -> 'Import YAML'*`.
+
+`*Then copy in the following content:*`
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: catalog-coolstore
+  namespace: {STAGING_PROJECT}
+spec:
+  hosts:
+    - catalog-coolstore
+  http:
+    - route:
+        - destination:
+            host: catalog-coolstore
+          weight: 90
+        - destination:
+            host: catalog-coolstore-v2
+          weight: 10
+----
+
+`*Click on 'Create'*`. By doing so, you route **90%** of the **HTTP traffic** to pods of the **Catalog Service** and
+the remaining **10%** to pods of the **Catalog Service v2**.
+
+[#generate_traffic]
+== Generate HTTP traffic
+
+Let's now see the A/B testing with Service Mesh in action.
+First, we need to generate HTTP traffic by sending several requests to the **Gateway Service** through the **Istio Gateway**.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: Gateway - Generate Traffic'*`.
+Watch out though, make sure you choose *Gateway* and NOT Inventory.
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+image::che-gateway-traffic.png[Che - Gateway Traffic,500,link=self,window=blank]
+
+In the '>_ Gateway - Generate Traffic' terminal window,
+you likely see **'Gateway => Catalog Spring Boot (v1)'** or **'Gateway => Catalog GoLang (v2)'**
+
+image::che-run-gateway-90-10.png[Terminal - Run Gateway Service,400,link=self,window=blank]
+
+TIP: You can also access link:http://web-coolstore-{STAGING_PROJECT}.{OPENSHIFT_APPS_DOMAIN}[your CoolStore from your browser^] and refresh the page to see that product descriptions are sometimes in uppercase (v2) or not (v1).
+
+In the link:{KIALI_URL}[Kiali Console^], from the **'Traffic Graph' view**,
+`*enter the following parameters*` to see the traffic distribution between Catalog v1 and v2:
+
+.Graph Settings
+[%header,cols="30%,70%"]
+|===
+|Parameter
+|Value
+
+|Namespace
+|{STAGING_PROJECT}
+
+|Graph Type
+|Versioned app graph
+
+|Display
+|'Traffic Animation' and 'Traffic Distribution' checked
+
+|===
+
+image::kiali-abtesting-90-10.png[Kiali - Graph,900,link=self,window=blank]
+
+You can see that the traffic between the two versions of the **Catalog** is shared as defined in the VirtualService
+(at least very, very close).
+
+NOTE: The Kiali *Traffic Distribution* values are for the whole application, so inventory-coolstore
+will take about 90% of the total traffic, leaving the remaining 9% and 1% split between the Catalog components, and this does
+reflect what was configured.
+
+[#validate_result]
+== Validate the result
+
+After a one-week trial, you have collected enough information to confirm that product descriptions in uppercase do increase sales.
+So **you will route all the traffic to Catalog Service v2**.
+
+In the link:{KIALI_URL}[Kiali Console^], `*click on 'Istio Config', then on the 'catalog-coolstore' VirtualService*`
+
+image::kiali-edit-catalog-coolstore-vs.png[Kiali - Edit Catalog Coolstore VirtualService,700,link=self,window=blank]
+
+Then, `*change the weights in the YAML editor as follows and click on 'Save'*`
+
+[source,yaml,subs="attributes+,+quotes"]
+----
+[...]
+spec:
+  hosts:
+    - catalog-coolstore
+  http:
+    - route:
+        - destination:
+            host: catalog-coolstore
+          **weight: 0**
+        - destination:
+            host: catalog-coolstore-v2
+          **weight: 100**
+[...]
+----
+
+Now, in your link:{WORKSPACE_URL}[Workspace^], in the '>_ Gateway - Generate Traffic' terminal window,
+you likely see only *'Gateway => Catalog GoLang (v2)'*.
+
+image::che-run-gateway-100-0.png[Terminal - Run Gateway Service,400,link=self,window=blank]
+
+And from the link:{KIALI_URL}[Kiali Console^], you can visualize that **100%** of the traffic is switching gradually to **Catalog Service v2**.
+It may take at least a minute for all the Kiali traffic to route to just Catalog Service v2 and confirm what the 'Generate Traffic' script is telling you.
+
+image::kiali-abtesting-100-0.png[Kiali - Graph,900,link=self,window=blank]
+
+So you can see the power of Service Mesh to externally manage the traffic flow between your application components, and of
+Kiali to visualize this behavior.
+
+That's all for this lab!

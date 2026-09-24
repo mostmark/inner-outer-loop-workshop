@@ -1,0 +1,376 @@
+= Monitor Application Health
+include::partial$_attributes.adoc[]
+
+_20 MINUTE EXERCISE_
+
+In this lab we will learn how to monitor application health using OpenShift
+health probes and how you can see container resource consumption using metrics.
+
+[sidebar]
+.OpenShift Health Probes
+--
+
+When building microservices, monitoring becomes of extreme importance to make sure all services
+are running at all times, and when they don't there are automatic actions triggered to rectify
+the issues.
+
+OpenShift, using Kubernetes health probes, offers a solution for monitoring application
+health and trying to automatically heal faulty containers through restarting them to fix issues such as
+a deadlock in the application which can be resolved by restarting the container. Restarting a container
+in such a state can help to make the application more available despite bugs.
+
+Furthermore, there are of course a category of issues that can't be resolved by restarting the container.
+In those scenarios, OpenShift would remove the faulty container from the built-in load-balancer and send traffic
+only to the healthy containers that remain.
+
+There are three types of health probes available in OpenShift: https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/application-health[startup, readiness and liveness probes^].
+
+* **Startup probes** determine if the container in which it is scheduled is started
+* **Readiness probes** determine if the container in which it is scheduled is ready to service requests
+* **Liveness probes** determine if the container in which it is scheduled is still running
+
+Health probes also provide crucial benefits when automating deployments with practices like rolling updates in
+order to remove downtime during deployments. A readiness health probe would signal OpenShift when to switch
+traffic from the old version of the container to the new version so that the users don't get affected during
+deployments.
+
+There are three ways to define a health probe for a container:
+
+* **HTTP Checks:** healthiness of the container is determined based on the response code of an HTTP
+endpoint. Anything between 200 and 399 is considered success. A HTTP check is ideal for applications
+that return HTTP status codes when completely initialized.
+
+* **Container Execution Checks:** a specified command is executed inside the container and the healthiness is
+determined based on the return value (0 is success).
+
+* **TCP Socket Checks:** a socket is opened on a specified port to the container and it's considered healthy
+only if the check can establish a connection. TCP socket check is ideal for applications that do not
+start listening until initialization is complete.
+--
+
+[#understanding_liveness]
+== Understanding Liveness Probes
+
+**What happens if you DON'T setup Liveness checks?**
+
+By default Pods are designed to be resilient, if a pod dies it will get restarted. Let's see
+this happening.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], under the Workloads menu
+`*click on 'Topology' -> the '(D) inventory-coolstore' Deployment -> 'Resources' -> the '(P) inventory-coolstore-xxxxxxxxxx-xxxxx' pod*`
+
+image::openshift-inventory-pod.png[OpenShift Inventory Pod,700,link=self,window=blank]
+
+On the pod details page, `*click on 'Actions' -> 'Delete Pod' -> 'Delete'*`
+
+image::openshift-inventory-delete-pod.png[OpenShift Inventory Delete Pod,700,link=self,window=blank]
+
+A new instance (pod) will be redeployed very quickly. Once deleted `*try to access your link:http://inventory-coolstore-{DEV_PROJECT}.{OPENSHIFT_APPS_DOMAIN}[Inventory Service^]*`.
+
+However, imagine the _Inventory Service_ is stuck in a state (Stopped listening, Deadlock, etc)
+where it cannot perform as it should. In this case, the pod will not immediately die, it will be in a zombie state.
+
+To make your application more robust and reliable, a **Liveness check** will be used to check
+if the container itself has become unresponsive. If the liveness probe fails due to a condition such as a deadlock,
+the container could automatically restart (based on its restart policy).
+
+[#understanding_readiness]
+== Understanding Readiness Probes
+
+**What happens if you DON'T setup Readiness checks?**
+
+Let's imagine you have traffic coming into the _Inventory Service_. We can do that with a simple script.
+
+In your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Generate Traffic'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+for i in {1..60}
+do
+    if [ $(curl -s -w "%\{http_code}" -o /dev/null http://inventory-coolstore.{DEV_PROJECT}.svc:8080/api/inventory/329299) == "200" ]
+    then
+        MSG="\033[0;32mThe request to Inventory Service has succeeded\033[0m"
+    else
+        MSG="\033[0;31mERROR - The request to Inventory Service has failed\033[0m"
+    fi
+
+    echo -e $MSG
+    sleep 1s
+done
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+You should have the following output:
+
+image::che-inventory-traffic.png[Che - Catalog Traffic OK,500,link=self,window=blank]
+
+Now let's scale out your _Inventory Service_ to 2 instances.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], under the Workloads menu,
+`*click on 'Topology' -> '(D) inventory-coolstore' -> 'Details' then click once on the up arrow
+on the right side of the pod ring*`.
+
+image::openshift-scale-out-inventory.png[OpenShift Scale Out Catalog,700,link=self,window=blank]
+
+You should see the 2 instances (pods) running.
+Now, `*switch back to your link:{WORKSPACE_URL}[Workspace^] and check the output of the 'Inventory - Generate Traffic' task*`.
+
+image::che-inventory-traffic-ko.png[Che - Catalog Traffic KO,500,link=self,window=blank]
+
+**Why do some requests fail?**
+Because as soon as the container is created, the traffic is sent to this new instance even if the application is not ready.
+(The _Inventory Service_ takes a few seconds to start up).
+
+TIP: This is a race condition based on that startup speed, sometimes this script won't fail, if that is the case scale the pods back to 1 instance and try again.
+
+In order to prevent this behaviour, a **Readiness check** is needed. It determines if the container is ready to service requests.
+If the readiness probe fails, the endpoints controller ensures the container has its IP address removed from the endpoints of all services.
+A readiness probe can be used to signal to the endpoints controller that even though a container is running, it should not receive any traffic from a proxy.
+
+First, scale down your _Inventory Service_ to 1 instance. In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], under the Workloads menu,
+`*click on 'Topology' -> '(D) inventory-coolstore' -> 'Details' then click once on the down arrow
+on the right side of the pod ring*`.
+
+Now let's go fix some of these problems.
+
+[#configuring_liveness]
+== Configuring Liveness Probes
+
+https://quarkus.io/guides/smallrye-health[SmallRye Health^] is a Quarkus extension which utilizes the MicroProfile Health specification.
+It allows applications to provide information about their state to external viewers via an API call which is typically useful
+in cloud environments where automated processes must be able to determine whether the application should be discarded or restarted.
+
+Let's add the needed dependencies to **/projects/workshop/labs/inventory-quarkus/pom.xml**.
+In your link:{WORKSPACE_URL}[Workspace^], `*edit the '/projects/workshop/labs/inventory-quarkus/pom.xml' file*`:
+
+[source,xml,role=copypaste]
+----
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-smallrye-health</artifactId>
+    </dependency>
+----
+
+Then, `*build and push the updated Inventory Service to the OpenShift cluster*`.
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/inventory-quarkus
+mvn package -Dquarkus.kubernetes.deploy=true -DskipTests -Dquarkus.container-image.group=$(oc project -q) -Dquarkus.kubernetes-client.trust-certs=true
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+Wait till the build is complete then use the Dev Spaces terminal window to `*Delete the Inventory Pod*` and make it start again with the new code.
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc delete pod -l component=inventory -n {DEV_PROJECT}
+----
+
+NOTE: In Dev Spaces, to open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+
+It will take a few seconds to restart, then verify that the health endpoint works for the **Inventory Service** using `*curl*`
+
+In your link:{WORKSPACE_URL}[Workspace^],
+`*execute the following commands in the terminal window*` - it may take a few attempts while the pod restarts.
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+curl -w "\n" http://inventory-coolstore.{DEV_PROJECT}.svc:8080/q/health
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+
+You should have the following output:
+
+[source,json]
+----
+{
+    "status": "UP",
+    "checks": [
+        {
+            "name": "Database connection(s) health check",
+            "status": "UP"
+        }
+    ]
+}
+----
+
+Liveness, Readiness and Startup health checks values have already been set for this service as part of the build and deploying
+using the *quarkus-smallrye-health* plugin.
+
+You can check this in the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], under the Workloads menu,
+`*click on 'Topology' -> '(D) inventory-coolstore' -> 'Actions' -> 'Edit Health Checks'*`.
+
+image::openshift-inventory-edit-health.png[Che - Inventory Add Health Check,700,link=self,window=blank]
+
+You can now click *Edit Probe* for each probe type in turn to see the configuration, here for example are the liveness settings:
+
+image::openshift-inventory-view-health.png[Che - Inventory View Health Check,700,link=self,window=blank]
+
+For each probe type the configuration and the API can be different since the delay, retry and responsiveness differs for each circumstance.
+
+[#testing_Readiness]
+== Testing Inventory Readiness Probes
+
+Now let's test it as you did previously.
+`*Generate traffic to Inventory Service*` and then, in the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^],
+`*scale out the Inventory Service to 2 instances (pods)*`
+
+In your link:{WORKSPACE_URL}[Workspace^], `*check the output of the 'Inventory - Generate Traffic' task*`.
+
+You should not see any errors, this means that you can now **scale out your _Inventory Service_ with no downtime.**
+
+image::che-inventory-traffic.png[Che - Catalog Traffic OK,500,link=self,window=blank]
+
+Now scale down your _Inventory Service_ back to 1 instance.
+
+[#catalog_services_probes]
+== Catalog Services Probes
+
+https://docs.spring.io/spring-boot/reference/actuator/index.html[Spring Boot Actuator^] is a
+sub-project of Spring Boot which adds health and management HTTP endpoints to the application. Enabling Spring Boot
+Actuator is done via adding **org.springframework.boot:spring-boot-starter-actuator** dependency to the Maven project
+dependencies which is already done for the **Catalog Service**.
+
+Verify that the health endpoint works for the **Catalog Service** using `*curl*`.
+
+In your link:{WORKSPACE_URL}[Workspace^], in the *terminal* window,
+`*execute the following commands*`:
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+curl -w "\n" http://catalog-coolstore.{DEV_PROJECT}.svc:8080/actuator/health
+----
+
+You should have the following output:
+
+[source,json]
+----
+{"status":"UP"}
+----
+
+Liveness and Readiness health checks values have already been set for this service as part of the build and deploying
+using Eclipse JKube in combination with the Spring Boot actuator.
+
+You can check this in the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], under the Workloads menu,
+`*click on 'Topology' -> '(D) catalog-coolstore' -> 'Actions' -> 'Edit Health Checks'*`.
+
+image::openshift-catalog-edit-health.png[Che - Catalog Add Health Check,700,link=self,window=blank]
+
+[#understanding_startup]
+== Understanding Startup Probes
+
+**Startup probes** are similar to liveness probes but only executed at startup.
+When a startup probe is configured, the other probes are disabled until it succeeds.
+
+Sometimes, some (legacy) applications might need extra time for their first initialization.
+In such cases, setting a longer liveness interval might compromise the main benefit of this probe, that is providing
+the fast response to stuck states.
+
+**Startup probes** are useful to cover this worst case startup time.
+
+[#monitoring_all_applications]
+== Monitoring All Application Healths
+
+Now you understand and know how to configure Readiness, Liveness and Startup probes, let's confirm your expertise!
+
+`*Configure the remaining Probes for Catalog*` using the following information:
+
+.Startup Probes
+[%header,cols=2*]
+|===
+|Catalog Service
+|Startup
+
+|Type
+|HTTP GET
+
+|Use HTTPS
+|_Unchecked_
+
+|HTTP Headers
+|_Empty_
+
+|Path
+|/actuator/health
+
+|Port
+|8080
+
+|Failure Threshold
+|15
+
+|Success Threshold
+|1
+
+|Initial Delay
+|0
+
+|Period
+|10
+
+|Timeout
+|1
+
+|===
+
+Finally, let's configure probes for Gateway and Web Service. For speed we will do this via script.
+In your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: Probes - Configure Gateway & Web'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+[#monitoring_application_metrics]
+== Monitoring Applications Metrics
+
+Metrics are another important aspect of monitoring applications which is required in order to
+gain visibility into how the application behaves and particularly in identifying issues.
+
+OpenShift provides container metrics out-of-the-box and displays how much memory, cpu and network
+each container has been consuming over time.
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the Workloads menu, `*click on 'Topology' -> any Deployment (D) and click on the associated Pod (P)*`
+
+In the pod `*Metrics*` tab, you can see a more detailed view of the pod consumption.
+
+image::openshift-pod-details.png[OpenShift Pod Details,740,link=self,window=blank]
+
+Well done! You are ready to move on to the next lab.

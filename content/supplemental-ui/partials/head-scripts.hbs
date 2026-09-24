@@ -1,0 +1,25 @@
+{{#with site.keys.googleAnalytics}}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{this}}"></script>
+<script>function gtag() { dataLayer.push(arguments) }; window.dataLayer = window.dataLayer || []; gtag('js', new Date()); gtag('config', '{{this}}')</script>
+{{/with}}
+<script>
+  // Derive OPENSHIFT_APPS_DOMAIN from OPENSHIFT_CONSOLE_URL (console-openshift-console.<apps domain>)
+  // and add it to the query string before the Showroom UI replaces %tokens% with URL parameters.
+  // An explicit OPENSHIFT_APPS_DOMAIN parameter wins.
+  (function () {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var consoleUrl = params.get('OPENSHIFT_CONSOLE_URL');
+      if (consoleUrl && !params.get('OPENSHIFT_APPS_DOMAIN')) {
+        var host = consoleUrl.replace(/^https?:\/\//, '').split('/')[0];
+        var domain = host.replace(/^console-openshift-console\./, '');
+        if (domain !== host) {
+          params.set('OPENSHIFT_APPS_DOMAIN', domain);
+          window.history.replaceState(null, '', window.location.pathname + '?' + params.toString() + window.location.hash);
+        }
+      }
+    } catch (e) {
+      window.console && window.console.error('Could not derive OPENSHIFT_APPS_DOMAIN', e);
+    }
+  })();
+</script>

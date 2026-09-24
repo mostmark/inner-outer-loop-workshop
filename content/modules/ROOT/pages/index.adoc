@@ -1,0 +1,92 @@
+= Welcome to the Inner & Outer Loop Workshop
+include::partial$_attributes.adoc[]
+
+[.text-center.strong]
+== Ready to become a Cloud Native Developer?
+
+This immersive workshop will put you in the Cloud Native world as a Developer: code, run and deploy modern applications on
+OpenShift, then promote them to the different environments (QA, staging and production) using rich and advanced development services.
+
+The goal of this hands-on workshop is to provide a Developer Experience through the Inner Loop and the Outer Loop using Cloud Native Technologies.
+
+To be a part of this journey, all you need is to bring your modern web browser.
+Everything else is running on the Cloud, on OpenShift.
+
+The workshop has two parts. Part 2 builds on the application you create in Part 1.
+
+== Part 1: Inner Loop
+
+image::inner-loop.png[Developer Inner Loop,400,link=self,window=blank]
+
+Get hands-on with cloud based code development using OpenShift Dev Spaces.
+
+Explore the inner loop by creating simple microservices with Quarkus, Spring Boot, .NET and Node.js.
+
+Deploy a web based application to OpenShift.
+
+Monitor its health.
+
+Discover OpenShift service resilience, scale and fault tolerance.
+
+Finally utilize external configuration to leverage OpenShift database access.
+
+Start with xref:inner-loop-01-introduction.adoc[Part 1: Inner Loop - Introduction].
+
+== Part 2: Outer Loop
+
+image::outer-loop.png[Developer Outer Loop,400,link=self,window=blank]
+
+Looking at the Developer Outer Loop you will build and deploy simple microservices to OpenShift.
+
+Explore Pipelines and GitOps with Tekton and Argo CD.
+
+Finally use the observability of Service Mesh to monitor application network activity.
+
+Start with xref:outer-loop-01-introduction.adoc[Part 2: Outer Loop - Introduction].
+
+== Audience
+
+A Developer, Architect, DevOps, or manager wishing to learn about Cloud Native development with OpenShift.
+Some programming experience, especially with Java, would be useful.
+
+[cols="1,1,3,3"]
+|===
+| *Part* | *Duration* | *Audience* | *Level*
+
+|Part 1: Inner Loop
+|3.5 hours
+|Developers that want to learn OpenShift and Kubernetes
+|Beginner with OpenShift
+
+|Part 2: Outer Loop
+|3.5 hours
+|Developers that want to learn OpenShift and Kubernetes
+|Basic experience of development and deployment on Kubernetes such as Part 1: Inner Loop
+|===
+
+== Your workshop environment
+
+Everything you need has been prepared for you on the OpenShift cluster:
+
+[cols="1,2"]
+|===
+|Resource |Value
+
+|OpenShift Console
+|link:{CONSOLE_URL}[{CONSOLE_URL}^]
+
+|Username
+|`{OPENSHIFT_USERNAME}`
+
+|Password
+|`{OPENSHIFT_PASSWORD}`
+
+|Development project (Part 1)
+|`{DEV_PROJECT}`
+
+|Staging project (Part 2)
+|`{STAGING_PROJECT}`
+
+|OpenShift Dev Spaces workspace
+|link:{WORKSPACE_URL}[{WORKSPACE_NAME}^]
+|===

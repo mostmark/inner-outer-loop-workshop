@@ -1,0 +1,22 @@
+// Shared attributes of the workshop. Every page includes this file right after its title:
+// include::partial$_attributes.adoc[]
+// Per-user values come from the URL parameters (see antora.yml).
+:experimental:
+:source-highlighter: highlightjs
+:icons: font
+:CONSOLE_URL: https://{OPENSHIFT_CONSOLE_URL}
+:DEV_PROJECT: my-project-{OPENSHIFT_USERNAME}
+:STAGING_PROJECT: cn-project-{OPENSHIFT_USERNAME}
+:DEVSPACES_NAMESPACE: devspaces-{OPENSHIFT_USERNAME}
+:DEVSPACES_URL: https://devspaces.{OPENSHIFT_APPS_DOMAIN}
+:WORKSPACE_NAME: wksp-end-to-end-dev
+:WORKSPACE_URL: {DEVSPACES_URL}/dashboard/#/ide/{DEVSPACES_NAMESPACE}/{WORKSPACE_NAME}
+:CODE_REPO_URL: https://github.com/mostmark/inner-outer-loop-workshop-code
+:CODE_REPO_GIT_URL: https://github.com/mostmark/inner-outer-loop-workshop-code.git
+:CODE_REPO_REF: main
+:FACTORY_URL: {DEVSPACES_URL}/#{CODE_REPO_GIT_URL}
+:GITEA_URL: https://gitea-server-gitea.{OPENSHIFT_APPS_DOMAIN}
+:GITEA_INTERNAL_URL: http://gitea-server.gitea.svc:3000
+:ARGOCD_URL: https://argocd-server-argocd.{OPENSHIFT_APPS_DOMAIN}
+:KIALI_URL: https://kiali-istio-system.{OPENSHIFT_APPS_DOMAIN}
+:MAVEN_MIRROR_URL: http://nexus.nexus.svc:8081/repository/maven-all-public/

@@ -1,0 +1,625 @@
+= Create Inventory Service with Quarkus
+include::partial$_attributes.adoc[]
+
+_40 MINUTE EXERCISE_
+
+In this lab you will learn about building microservices using Quarkus.
+
+image::coolstore-arch-inventory-quarkus.png[CoolStore Architecture,400,link=self,window=blank]
+
+[#what_is_quarkus]
+== What is Quarkus?
+
+[sidebar]
+--
+image::quarkus-logo.png[Quarkus,500,link=self,window=blank]
+
+https://quarkus.io/[Quarkus^] is a Kubernetes Native Java stack tailored for GraalVM & OpenJDK HotSpot,
+crafted from the best of breed Java libraries and standards.
+
+**Container First**: https://quarkus.io/[Quarkus^] tailors your application for GraalVM and HotSpot. Amazingly fast boot time, incredibly low RSS memory
+(not just heap size!) offering near instant scale up and high density memory utilization in container orchestration platforms
+like Kubernetes. We use a technique we call https://quarkus.io/vision/container-first[compile time boot^].
+
+**Unifies Imperative and Reactive**: Combine both the familiar https://quarkus.io/vision/continuum[imperative code and
+the non-blocking reactive style^] when developing applications
+
+**Developer Joy**: A cohesive platform for optimized developer joy:
+
+* Unified configuration
+* Zero config, live reload in the blink of an eye
+* Streamlined code for the 80% common usages, flexible for the 20%
+* No hassle native executable generation
+
+**Best of Breed Libraries and Standards**: Quarkus brings a cohesive, fun to use full-stack framework by leveraging best of breed libraries you
+love and use wired on a https://quarkus.io/vision/standards[standard backbone^].
+--
+
+[#quarkus_maven_project]
+== Quarkus Maven Project
+
+The **inventory-quarkus** project has the following structure which shows the components of
+the Quarkus project laid out in different subdirectories according to Maven best practices:
+
+image::inventory-quarkus-project.png[Inventory Project,500,link=self,window=blank]
+
+The **'/projects/workshop/labs/inventory-quarkus'** folder contents:
+
+* the Maven structure
+* a com.redhat.cloudnative.InventoryResource resource exposed on /hello
+* an associated unit test
+* a landing page that is accessible on http://localhost:8080 after starting the application
+* example Dockerfile files for both native and jvm modes in src/main/docker
+* the application configuration file
+
+`*Look at the pom.xml*`. You will find the import of the Quarkus BOM, allowing you to omit the version
+on the different Quarkus dependencies. In addition, you can see the **quarkus-maven-plugin** responsible for the packaging
+of the application and also providing the *development mode* feature.
+
+[source,xml]
+----
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-bom</artifactId>
+            <version>${quarkus.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-maven-plugin</artifactId>
+            <version>${quarkus.version}</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>build</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+----
+
+If we focus on the dependencies section, you can see the following extensions:
+
+[source,xml]
+----
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-rest</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.rest-assured</groupId>
+        <artifactId>rest-assured</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-rest-jackson</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-hibernate-orm</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-jdbc-h2</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-openshift</artifactId>
+    </dependency>
+----
+
+.Quarkus Extensions
+[%header,cols=2*]
+|===
+|Name
+|Description
+
+|https://quarkus.io/guides/rest-json[JSON REST Services^]
+|It allows you to develop REST services to consume and produce JSON payloads
+
+|https://quarkus.io/guides/hibernate-orm[Hibernate ORM^]
+|The de facto JPA implementation and offers you the full breadth of an Object Relational Mapper.
+
+|https://quarkus.io/guides/datasource[Datasources (H2)^]
+|Using datasources is the main way of obtaining connections to a database.
+
+|https://quarkus.io/guides/deploying-to-openshift[OpenShift^]
+|Understands how to deploy an application to OpenShift
+
+|===
+
+`*Examine 'src/main/java/com/redhat/cloudnative/InventoryResource.java' file*`:
+
+[source,java]
+----
+package com.redhat.cloudnative;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/hello")
+public class InventoryResource {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "hello";
+    }
+}
+----
+
+It's a very simple REST endpoint, returning "hello" to requests on "/hello".
+
+[TIP]
+====
+With Quarkus, there is no need to create an Application class. It's supported, but not required. In addition,
+only one instance of the resource is created and not one per request. You can configure this using the different **Scoped** annotations
+(ApplicationScoped, RequestScoped, etc).
+====
+
+[#enable_development_mode]
+== Enable the Development Mode
+
+**quarkus:dev** runs Quarkus in development mode. This enables hot deployment with background compilation,
+which means that when you modify your Java files and/or your resource files and refresh your browser, these changes will
+automatically take effect. This works too for resource files like the configuration property file. Refreshing the browser
+triggers a scan of the workspace, and if any changes are detected, the Java files are recompiled and the application is redeployed;
+your request is then serviced by the redeployed application. If there are any issues with compilation or deployment an error page
+will let you know.
+
+First, in your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Compile (Dev Mode)'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/inventory-quarkus
+mvn compile quarkus:dev -Ddebug=false
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+
+--
+====
+
+When pop-ups appear, *confirm you want to expose the 8080 port* by `*clicking on 'Open in New Tab'*`.
+
+image::che-open-8080-link.png[Che - Open Link,500,link=self,window=blank]
+
+You then have to confirm the access to external web sites:
+
+image::vscode-external-website.png[Che - Open Link,500,link=self,window=blank]
+
+Your browser will be directed to **your Inventory Service running inside your Workspace**.
+
+image::che-quarkus-preview.png[Che - Quarkus Preview,500,link=self,window=blank]
+
+If the Quarkus app is unavailable then you need to be patient, the app hasn't quite launched yet to handle the
+request. `*Click on the browser Refresh icon*` to try again. If it still fails see the section below.
+
+=== Fix up the Browser URL
+
+If you are still seeing the following result in the browser window then it's likely your (Chromium)
+browser is upgrading the simple *http://* based URL to *https* - but the inventory app doesn't support that.
+
+image::inventory-quarkus-url-unavailable.png[Che - Preview Not Available,600,link=self,window=blank]
+
+To fix this you need to `*click in the URL bar*` in the browser
+
+image::inventory-quarkus-edit-url.png[Che - Preview Not Available,600,link=self,window=blank]
+
+and `*remove that "s"*` making it *Not Secure* - like this:
+
+image::inventory-quarkus-edited-url.png[Che - Preview Not Available,600,link=self,window=blank]
+
+[TIP]
+====
+You will need to do this with all your application URLs, but fortunately the browser quickly remembers.
+====
+
+[NOTE]
+====
+Please *don't close* that Inventory output browser tab, you will need it for the next few steps of this lab.
+
+If by accident you close that browser tab then you should be able to reopen it from your browser history.
+It will likely be called *Inventory Service*
+====
+
+=== Now Make a Code Change
+
+So now back in the Dev Spaces IDE `*modify the 'src/main/resources/META-INF/resources/index.html' file*` as follows
+
+[source,html,role=copypaste]
+----
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Inventory Service</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css"
+            integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+        <link rel="stylesheet" type="text/css"
+            href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly.min.css">
+        <link rel="stylesheet" type="text/css"
+            href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly-additions.min.css">
+    </head>
+    <body>
+        <div class="jumbotron">
+            <div class="container">
+                <h1 class="display-3"><img src="quarkus_icon_512px_default.png" alt="Quarkus" width="100"> Inventory Service</h1>
+                <p>This is a Quarkus Microservice for the CoolStore Demo. (<a href="/api/inventory/329299">Test it</a>)
+                </p>
+            </div>
+        </div>
+        <div class="container">
+            <footer>
+                <p>&copy; Red Hat 2024</p>
+            </footer>
+        </div>
+    </body>
+</html>
+----
+
+`*Refresh your browser*` (for the *Inventory Service* tab just opened) and you should see the new HTML content **without rebuilding your JAR file**
+
+image::inventory-quarkus.png[Inventory Quarkus,500,link=self,window=blank]
+
+Now let's write some code and create a domain model and a RESTful endpoint to create the Inventory service
+
+[#create_domain_model]
+== Create a Domain Model
+
+`*Create the 'src/main/java/com/redhat/cloudnative/Inventory.java' file*` as follows:
+
+[source,java,role=copypaste]
+----
+package com.redhat.cloudnative;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Column;
+import java.io.Serializable;
+
+@Entity // <1>
+@Table(name = "INVENTORY") // <2>
+public class Inventory implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @Id // <3>
+    private String itemId;
+
+    @Column
+    private int quantity;
+
+    public Inventory() {
+    }
+
+    public String getItemId() {
+        return itemId;
+    }
+
+    public void setItemId(String itemId) {
+        this.itemId = itemId;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    @Override
+    public String toString() {
+        return "Inventory [itemId='" + itemId + '\'' + ", quantity=" + quantity + ']';
+    }
+}
+----
+<1> **@Entity** marks the class as a JPA entity
+<2> **@Table** customizes the table creation process by defining a table name and database constraint
+<3> **@Id** marks the primary key for the table
+
+[NOTE]
+====
+You don't need to press a save button! VS Code automatically saves the changes made to the files.
+====
+
+`*Update the 'src/main/resources/application.properties' file*` to match with the following content:
+
+[source,properties,role=copypaste]
+----
+quarkus.datasource.db-kind=h2
+quarkus.datasource.jdbc.url=jdbc:h2:mem:inventory;DB_CLOSE_ON_EXIT=FALSE;DB_CLOSE_DELAY=-1
+quarkus.datasource.username=sa
+quarkus.datasource.password=sa
+quarkus.hibernate-orm.database.generation=drop-and-create
+quarkus.hibernate-orm.log.sql=true
+quarkus.hibernate-orm.sql-load-script=import.sql
+quarkus.http.host=0.0.0.0
+
+# these value are required for a quarkus openshift plugin build <1>
+%prod.quarkus.openshift.route.expose=true
+%prod.quarkus.openshift.deployment-kind=Deployment
+%prod.quarkus.openshift.labels.app=coolstore
+%prod.quarkus.openshift.labels.component=inventory
+%prod.quarkus.openshift.part-of=coolstore
+%prod.quarkus.container-image.name=inventory-coolstore
+%prod.quarkus.openshift.name=inventory-coolstore
+%prod.quarkus.openshift.ports."http".host-port=8080
+%prod.quarkus.openshift.add-version-to-label-selectors=false
+%prod.quarkus.openshift.labels."app.kubernetes.io/instance"=inventory
+----
+<1> There is a lot of additional configuration here to allow the quarkus-maven-plugin to build
+and then deploy this application to OpenShift - but more of that later
+
+`*Update the 'src/main/resources/import.sql' file*` as follows:
+
+[source,sql,role=copypaste]
+----
+INSERT INTO INVENTORY(itemId, quantity) VALUES (100000, 0);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (329299, 35);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (329199, 12);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (165613, 45);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (165614, 87);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (165954, 43);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (444434, 32);
+INSERT INTO INVENTORY(itemId, quantity) VALUES (444435, 53);
+----
+
+[#create_restful_service]
+== Create a RESTful Service
+
+Quarkus uses the JAX-RS standard for building REST services.
+
+`*Modify the 'src/main/java/com/redhat/cloudnative/InventoryResource.java' file*` to match with:
+
+[source,java,role=copypaste]
+----
+package com.redhat.cloudnative;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/api/inventory")
+@ApplicationScoped
+public class InventoryResource {
+
+    @Inject
+    EntityManager em;
+
+    @GET
+    @Path("/{itemId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Inventory getAvailability(@PathParam("itemId") String itemId) {
+        Inventory inventory = em.find(Inventory.class, itemId);
+        return inventory;
+    }
+}
+----
+
+The above REST service defines an endpoint that is accessible via **HTTP GET** at
+for example **/api/inventory/329299** with
+the last path param being the product id which we want to check its inventory status.
+
+`*Refresh your Inventory output browser and click on 'Test it'*`. You should have the following output:
+
+[source,json]
+----
+{"itemId":"329299","quantity":35}
+----
+
+The REST API returned a JSON object representing the inventory count for this product. Congratulations!
+
+[#stop_development_mode]
+== Stop the Development Mode
+
+In your link:{WORKSPACE_URL}[Workspace^], stop the service as follows:
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Enter Ctrl+c in the existing '>_ Inventory - Compile (Dev Mode)' terminal window*`
+--
+
+CLI::
++
+--
+`*Enter Ctrl+c in the existing terminal window*`
+--
+====
+
+[#deploy_on_openshift]
+== Deploy on OpenShift
+
+Using the quarkus-maven-plugin, the Quarkus https://quarkus.io/guides/deploying-to-openshift[OpenShift Extension^] and Source-to-Image (S2I)
+it's time to deploy your service on OpenShift using all that information in the *src/main/resources/application.properties* file
+we saw earlier.
+
+In this section you will locally build a .jar file, then *create* the OpenShift build and deployment components
+and *push* the .jar to OpenShift. The OpenShift https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/builds_using_buildconfig/understanding-image-builds[Source-to-Image (S2I)^] builder
+will then package the .jar file into a container and run it.
+
+[source,properties]
+----
+# these value are required for a quarkus openshift plugin build
+%prod.quarkus.openshift.route.expose=true<3>
+%prod.quarkus.openshift.deployment-kind=Deployment
+%prod.quarkus.openshift.labels.app=coolstore
+%prod.quarkus.openshift.labels.component=inventory<1>
+%prod.quarkus.openshift.part-of=coolstore
+%prod.quarkus.container-image.name=inventory-coolstore
+%prod.quarkus.openshift.name=inventory-coolstore
+%prod.quarkus.openshift.ports."http".host-port=8080<2>
+%prod.quarkus.openshift.add-version-to-label-selectors=false
+%prod.quarkus.openshift.labels."app.kubernetes.io/instance"=inventory<1>
+----
+<1> It's called *inventory*
+<2> The service port 8080 will be used for HTTP
+<3> The application has an external route for public access
+
+In your link:{WORKSPACE_URL}[Workspace^], **build** your jar file.
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Build'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/inventory-quarkus
+mvn clean package -DskipTests
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+Once this completes, **deploy** your application code/binary for OpenShift. By watching the
+log output you should see this activity:
+
+* Push the jar file to OpenShift
+* Create OpenShift deployment components
+* Build a container using a Dockerfile/Containerfile
+* Push this container image to the OpenShift registry
+* Deploying the application to OpenShift
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/inventory-quarkus
+mvn package -Dquarkus.kubernetes.deploy=true -DskipTests -Dquarkus.container-image.group=$(oc project -q) -Dquarkus.kubernetes-client.trust-certs=true
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+The output should be similar to this:
+
+[source,shell,subs="attributes+"]
+----
+[INFO] [io.quarkus...] STEP 3/9: ENV OPENSHIFT_BUILD_NAME="inventory-coolstore-1"     OPENSHIFT_BUILD_NAMESPACE="{DEV_PROJECT}"
+[INFO] [io.quarkus....] STEP 4/9: USER root
+[INFO] [io.quarkus....] STEP 5/9: COPY upload/src /tmp/src
+[INFO] [io.quarkus....] STEP 6/9: RUN chown -R 185:0 /tmp/src
+[INFO] [io.quarkus....] STEP 7/9: USER 185
+[INFO] [io.quarkus....] STEP 8/9: RUN /usr/local/s2i/assemble
+[INFO] [io.quarkus....] INFO S2I source build with plain binaries detected
+[INFO] [io.quarkus....] INFO Copying binaries from /tmp/src to /deployments ...
+[INFO] [io.quarkus....] inventory-quarkus-1.0.0-SNAPSHOT-runner.jar
+[INFO] [io.quarkus....] INFO Cleaning up source directory (/tmp/src)
+[INFO] [io.quarkus....] STEP 9/9: CMD /usr/local/s2i/run
+[INFO] [io.quarkus....] COMMIT temp.builder.openshift.io/{DEV_PROJECT}/inventory-coolstore-1:2c2db764
+[INFO] [io.quarkus....] Getting image source signatures
+...
+[INFO] [io.quarkus....] Successfully tagged temp.builder.openshift.io/{DEV_PROJECT}/inventory-coolstore-1:2c2db764
+[INFO] [io.quarkus....]
+[INFO] [io.quarkus....] Pushing image image-registry.openshift-image-registry.svc:5000/{DEV_PROJECT}/inventory-coolstore:1.0.0-SNAPSHOT ...
+[INFO] [io.quarkus....] Getting image source signatures
+...
+[INFO] [io.quarkus....] Successfully pushed image-registry.openshift-image-registry.svc:5000/{DEV_PROJECT}/inventory-coolstore@sha256:be5b8ccdf161f4166ea0d040fcc78e1a09f8f20b16eb1b0d12ce288cd70c0643
+[INFO] [io.quarkus....] Push successful
+[INFO] [io.quarkus....] Deploying to openshift server: https://172.30.0.1:443/ in namespace: {DEV_PROJECT}.
+[INFO] [io.quarkus....] Applied: ImageStream inventory-coolstore.
+[INFO] [io.quarkus....] Applied: Deployment inventory-coolstore.
+[INFO] [io.quarkus....] Applied: ImageStream openjdk-21.
+[INFO] [io.quarkus....] Applied: Service inventory-coolstore.
+[INFO] [io.quarkus....] Applied: Route inventory-coolstore.
+[INFO] [io.quarkus....] Applied: BuildConfig inventory-coolstore.
+[INFO] [io.quarkus....] The deployed application can be accessed at: http://inventory-coolstore-{DEV_PROJECT}.{OPENSHIFT_APPS_DOMAIN}
+[INFO] [io.quarkus.deployment.QuarkusAugmentor] Quarkus augmentation completed in 170564ms
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+----
+
+Once this completes, your application should be up and running.
+
+OpenShift runs the different components of the application
+in one or more pods. A pod is the unit of runtime deployment and consists of the running containers for the project.
+
+[#test_your_service]
+== Test your Service
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Open URL' icon of the Inventory Service*`
+
+image::openshift-inventory-topology.png[OpenShift - Inventory Topology,700,link=self,window=blank]
+
+Your browser will be redirected to **your Inventory Service running on OpenShift**.
+
+image::inventory-quarkus.png[Inventory Quarkus,500,link=self,window=blank]
+
+Then `*click on 'Test it'*`. You should have the following output:
+
+[source,json]
+----
+{"itemId":"329299","quantity":35}
+----
+
+Well done! You are ready to move on to the next lab, but before you go, you probably should close those
+Inventory Service output browser tabs from the beginning of this chapter.

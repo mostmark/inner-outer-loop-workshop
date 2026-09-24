@@ -1,0 +1,152 @@
+= Prepare your Developer Workspace
+include::partial$_attributes.adoc[]
+
+_10 MINUTE EXERCISE_
+
+In this lab you will get your Developer Workspace ready for the Outer Loop: you connect it to your OpenShift user
+and make sure that the CoolStore application runs in your Development environment `{DEV_PROJECT}`.
+
+[#open_your_developer_workspace]
+== Open your Developer Workspace
+
+For this part of the workshop you use the same *Developer Workspace* in
+https://access.redhat.com/products/red-hat-openshift-dev-spaces[OpenShift Dev Spaces^] as in Part 1.
+It is already created for you and contains all the tools and the source code you need.
+
+* *If you completed Part 1*, keep working in the browser tab of your workspace. If you closed it, open it again with the button below.
+* *If you start with Part 2*, open your workspace with the button below. The first start works exactly as described in
+xref:inner-loop-02-developer-workspace.adoc#get_your_developer_workspace[Part 1 - Get your Developer Workspace,role='params-link'].
+
+`*Click on the 'Developer Workspace' button below*`
+
+image::developer-workspace-button.png[Developer Workspace - Button,300,link={WORKSPACE_URL},window=_blank,align=center]
+
+If you are asked to log in, `*click on 'Log in with OpenShift'*` and `*log in as {OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD}*`.
+When the workspace opens for the first time, `*trust*` the authors of the files in the workspace and skip the
+Visual Studio Code settings with `*Mark Done*`.
+
+Once completed, you have a fully functional browser-based IDE with the source code already imported.
+
+image::che-workspace.png[Che - Workspace,700,link=self,window=blank]
+
+[#connect_your_workspace]
+== Connect Your Workspace to Your OpenShift User
+
+First, in your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: OpenShift - Login'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following command in the terminal window*`
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+oc login $(oc whoami --show-server) --username={OPENSHIFT_USERNAME} --password={OPENSHIFT_PASSWORD} --insecure-skip-tls-verify
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+
+--
+====
+
+The output should be similar to the following:
+
+[source,shell,subs="attributes+"]
+----
+Login successful.
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+    {STAGING_PROJECT}
+  * {DEVSPACES_NAMESPACE}
+    {DEV_PROJECT}
+
+Using project "{DEVSPACES_NAMESPACE}".
+----
+
+The projects `{DEV_PROJECT}` (your Development environment) and `{STAGING_PROJECT}` (your Staging environment)
+have been prepared for you.
+
+[#deploy_coolstore_application]
+== Deploy the CoolStore Application in your Development Environment
+
+[IMPORTANT]
+====
+*Skip this step if you completed Part 1* and your CoolStore application is up and running in `{DEV_PROJECT}`.
+The task reverts all local changes in the lab folders of your workspace and redeploys the whole application.
+====
+
+If you start with Part 2, deploy the result of Part 1 with a single command.
+
+In your link:{WORKSPACE_URL}[Workspace^],
+`*click on 'Terminal' -> 'Run Task...' -> 'devfile: Inner Loop - Deploy Coolstore'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+A terminal should be opened with the following output:
+
+[source,shell,subs="attributes+"]
+----
+Now using project "{DEV_PROJECT}" on server "https://{OPENSHIFT_API_URL}".
+[...]
+deployment.apps/catalog-coolstore annotated
+deployment.apps/inventory-coolstore annotated
+Application Configuration Externalization Done
+The deployment of the Coolstore Application in {DEV_PROJECT} by Inner Loop has succeeded
+----
+
+[#login_to_openshift]
+== Log in to the OpenShift Console
+
+OpenShift ships with a web-based console that allows users to
+perform various tasks via a browser.
+
+`*Click on the 'OpenShift Console' button below*`
+
+image::developer-console-button.png[OpenShift Console - Button,300,link={CONSOLE_URL}/topology/ns/{DEV_PROJECT},window=_blank,align=center]
+
+If you are asked to log in, `*enter your username and password ({OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD})*`.
+The console opens the *Topology* view of your project.
+If another project is shown, `*select '{DEV_PROJECT}'*` in the project list at the top of the page.
+The Topology view lists all of the deployments, pods, services and routes that you have
+running as part of your project.
+
+You should have the whole CoolStore application up and running in your Development environment (`{DEV_PROJECT}`).
+
+image::openshift-inner-loop-coolstore.png[OpenShift - Inner Loop Coolstore,700,link=self,window=blank]
+
+Test the application by `*clicking on the Route icon*` of the Node.js based `web-coolstore` component.
+
+[#fix_browser_url]
+== Fix up the Browser URL
+
+The application routes of this workshop use plain *http://*. If you see the following result in the browser window,
+your browser has most likely upgraded the *http://* URL to *https://*, which the deployed applications don't support.
+
+image::inventory-quarkus-url-unavailable.png[Application is not available,600,link=self,window=blank]
+
+To fix this, `*click in the URL bar*` of the browser
+
+image::inventory-quarkus-edit-url.png[Edit the URL,600,link=self,window=blank]
+
+and `*remove the "s"*` of *https*, making it *Not Secure*, like this:
+
+image::inventory-quarkus-edited-url.png[Edited URL,600,link=self,window=blank]
+
+[TIP]
+====
+You may need to do this for each application URL, but the browser quickly remembers your choice.
+====
+
+Now you are ready to get started with the Outer Loop labs!

@@ -1,0 +1,30 @@
+= Introduction
+include::partial$_attributes.adoc[]
+
+_1 MINUTE EXERCISE_
+
+In this part of the workshop you will learn how to promote your application code from Development to Production.
+You will work through the Developer *Outer Loop*: promote the CoolStore application to the different environments on OpenShift
+using rich and advanced development services.
+
+image::outer-loop.png[Developer Outer Loop,400,link=self,window=blank]
+
+You will learn about:
+
+* **Continuous Integration/Continuous Delivery** (CI/CD) with OpenShift Pipelines
+* **GitOps** workflow with Argo CD
+
+In addition, you will learn how to enable **Service Mesh** capability on OpenShift for monitoring your applications
+and how to use it for advanced deployment techniques.
+
+[NOTE]
+.Before you start
+====
+Part 2 builds on the CoolStore application that you built and deployed in your Development project `{DEV_PROJECT}`
+during xref:inner-loop-01-introduction.adoc[Part 1: Inner Loop,role='params-link'].
+If you start the workshop with Part 2, you will deploy that application with a single command in the next lab.
+
+All you need is a modern web browser. Everything else runs on OpenShift.
+====
+
+Let's start by preparing your Developer Workspace with OpenShift Dev Spaces.

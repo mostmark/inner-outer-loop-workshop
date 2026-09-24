@@ -1,0 +1,308 @@
+= GitOps Workflow with Argo CD
+include::partial$_attributes.adoc[]
+
+_20 MINUTE EXERCISE_
+
+In this lab you will learn about deploying and managing Kubernetes resources using a GitOps tool.
+
+[sidebar]
+.GitOps Methodology
+--
+**GitOps** is a set of practices that leverages Git workflows to manage infrastructure and application configurations.
+By using Git repositories as the source of truth, it allows the DevOps team to store the entire state of the cluster configuration in Git so that the trail of changes is visible and auditable.
+
+**GitOps** simplifies the propagation of infrastructure and application
+configuration changes across multiple clusters by defining your infrastructure and applications definitions as "code".
+
+* Ensure that the clusters have similar states for configuration, monitoring, or storage.
+* Recover or recreate clusters from a known state.
+* Create clusters with a known state.
+* Apply or revert configuration changes to multiple clusters.
+* Associate templated configuration with different environments.
+
+**GitOps** is also beneficial for application configuration management. It ensures consistency in applications when you deploy them to
+different clusters in different environments, like development, stage, and production.
+
+* Promote applications across clusters, from stage to production.
+* Apply or revert application changes to multiple OpenShift clusters.
+
+OpenShift provides the flexibility to choose when and how you integrate GitOps methodology into your business practices and pipelines.
+--
+
+[#export_openshift_resources]
+== Export OpenShift Resources
+
+First, you need to export the project resources from OpenShift.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: GitOps - Export Coolstore'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+A terminal should be opened with the following output:
+
+[source,shell,subs="attributes+"]
+----
+--- Export Kubernetes resources for GitOps from {DEV_PROJECT} to {STAGING_PROJECT} ---
+Exporting resources for inventory-coolstore...
+Exporting resources for catalog-coolstore...
+Exporting resources for gateway-coolstore...
+Exporting resources for web-coolstore...
+--- Kubernetes resources has been exported! ---
+----
+
+This operation exports the project resources (deployment, configmap, route, secret, service)
+and cleans them up. As a result, you should have all resources in YAML files under
+the **/projects/workshop/labs/gitops** folder.
+
+image::che-gitops-export-result.png[Che - GitOps Export Result,300,link=self,window=blank]
+
+[#create_git_repository]
+== Create a Git Repository for Your Configuration
+
+The next step is to store all Kubernetes/OpenShift resources in
+a source code repository.
+
+In your link:{GITEA_URL}[Git Repository^], `*create a new repository*` as follows:
+
+.GitOps Repository
+[%header,cols=2*]
+|===
+|Parameter
+|Value
+
+|Repository Name*
+|inventory-gitops
+
+|===
+
+[#push_inventory_configuration]
+== Push the Configuration of Inventory Service into the Git Repository
+
+Now that you have a Git repository for the configuration, you should push the exported Inventory configuration into it.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: GitOps - Commit Inventory'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+A terminal should be opened with an output similar to the following:
+
+[source,shell,subs="attributes+"]
+----
+Initialized empty Git repository in /projects/workshop/labs/gitops/inventory-coolstore/.git/
+[main (root-commit) 918f5d6] Initial Inventory GitOps
+ 5 files changed, [...] insertions(+)
+ create mode 100644 configmap.yaml
+ create mode 100644 deployment.yaml
+ create mode 100644 route.yaml
+ create mode 100644 secret.yaml
+ create mode 100644 service.yaml
+[...]
+To {GITEA_INTERNAL_URL}/{OPENSHIFT_USERNAME}/inventory-gitops.git
+ * [new branch]      main -> main
+----
+
+Once done, in your link:{GITEA_URL}/{OPENSHIFT_USERNAME}/inventory-gitops[Git Repository^], `*refresh the page of your 'inventory-gitops' repository*`.
+You should see the files in the repository.
+
+image::gitea-inventory-gitops-repo.png[GitOps Repository,900,link=self,window=blank]
+
+[#what_is_argocd]
+== What is Argo CD?
+
+[sidebar]
+--
+image::argocd-logo.png[Argo CD Logo,200]
+
+https://argo-cd.readthedocs.io/[Argo CD^] is a declarative, GitOps continuous delivery tool for Kubernetes.
+
+It follows the GitOps pattern of using Git repositories as the source of truth for defining
+the desired application state.
+
+It automates the deployment of the desired application states in the specified target environments. Application
+deployments can track updates to branches, tags, or be pinned to a specific version of manifests at a Git commit.
+--
+
+[#login_to_argocd]
+== Log in to Argo CD
+
+`*Click on the 'Developer GitOps' button below*`
+
+image::developer-gitops-button.png[Developer GitOps - Button,300,link={ARGOCD_URL},window=_blank,align=center]
+
+Then `*click on 'LOG IN VIA OPENSHIFT'*`.
+
+image::argocd-login-page.png[Argo CD - Login Page,700,link=self,window=blank]
+
+If you are asked to log in to OpenShift, `*log in as {OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD}*`.
+The first time, OpenShift asks you to authorize Argo CD to access your account: `*click on 'Allow selected permissions'*`.
+Once completed, you will be redirected to the following page.
+
+image::argocd-home.png[Argo CD - Home Page,500,link=self,window=blank]
+
+NOTE: This Argo CD instance is shared by all participants. You can only see and manage the Applications and repositories of
+your own Argo CD project `{STAGING_PROJECT}`, which deploys to your Staging project `{STAGING_PROJECT}`.
+
+[#add_gitops_repository]
+== Add your Newly Created GitOps Repository
+
+In link:{ARGOCD_URL}[Argo CD^], `*select 'Settings' in the left menu, then click on 'Repositories'*`
+
+image::argocd-configure-repositories.png[Argo CD - Configure Repositories,500,link=self,window=blank]
+
+`*Click on '+ Connect Repo'*`, `*choose 'VIA HTTPS'*` as the connection method and enter the following:
+
+.Repository Configuration
+[%header,cols="30%,70%"]
+|===
+|Parameter
+|Value
+
+|Type
+|git
+
+|Project
+|{STAGING_PROJECT}
+
+|Repository URL
+|pass:a[{GITEA_INTERNAL_URL}/{OPENSHIFT_USERNAME}/inventory-gitops.git]
+
+|===
+
+Your Gitea repositories are public, so you don't need to enter any credentials.
+Finally, `*click on 'Connect'*`.
+
+Your GitOps repository is now added to Argo CD and its connection status should be *Successful*.
+
+image::argocd-inventory-repository.png[Argo CD - Repository,800,link=self,window=blank]
+
+[#create_gitops_application]
+== Create a GitOps Application
+
+In link:{ARGOCD_URL}[Argo CD^], `*select 'Applications' in the left menu, then click on '+ New App'*` and enter the following details:
+
+image::argocd-configure-application.png[Argo CD - Configure Application,500,link=self,window=blank]
+
+.Application Configuration
+[%header,cols=3*]
+|===
+|Section
+|Parameter
+|Value
+
+|GENERAL
+|Application Name
+|inventory-{OPENSHIFT_USERNAME}
+
+|GENERAL
+|Project Name
+|{STAGING_PROJECT}
+
+|GENERAL
+|Sync Policy
+|Manual
+
+|SOURCE
+|Repository URL
+|pass:a[{GITEA_INTERNAL_URL}/{OPENSHIFT_USERNAME}/inventory-gitops.git]
+
+|SOURCE
+|Revision
+|HEAD
+
+|SOURCE
+|Path
+|. _(dot)_
+
+|DESTINATION
+|Cluster URL
+|\https://kubernetes.default.svc
+
+|DESTINATION
+|Namespace
+|{STAGING_PROJECT}
+
+|===
+
+TIP: The exact labels of the fields and buttons can differ slightly between Argo CD versions.
+
+Finally, `*click on 'Create'*`.
+
+Your Inventory Application has been created in Argo CD.
+
+image::argocd-outofsync-inventory-application.png[Argo CD - OutOfSync Application,700,link=self,window=blank]
+
+The application status is initially in the yellow **OutOfSync** state since the application has yet to be
+deployed into the `{STAGING_PROJECT}` OpenShift project, and no Kubernetes resources have been created.
+`*Click on the 'inventory-{OPENSHIFT_USERNAME}' application*` to see its resources.
+
+image::argocd-outofsync-inventory-details.png[Argo CD - OutOfSync Application,900,link=self,window=blank]
+
+[#deploy_resource]
+== Deploy a Resource on OpenShift
+
+In link:{ARGOCD_URL}[Argo CD^], in the resource tree of the `inventory-{OPENSHIFT_USERNAME}` application,
+`*click on the three-dot menu of the 'inventory' ConfigMap resource (cm), then select 'Sync'*`
+
+image::argocd-cm-inventory-sync.png[Argo CD - CM Inventory Sync,700,link=self,window=blank]
+
+Then `*click on the 'Synchronize' button*`. Now the ConfigMap of Inventory has been deployed and synchronized
+with your environment.
+
+In the link:{CONSOLE_URL}/k8s/ns/{STAGING_PROJECT}/configmaps[OpenShift Console^],
+`*select your '{STAGING_PROJECT}' project*` and `*click on the 'Workloads' menu and 'ConfigMaps'*`. You should find the resource you just
+deployed via Argo CD.
+
+image::openshift-cm-inventory-deployed.png[OpenShift - CM Inventory Deployed,500,link=self,window=blank]
+
+[#configuration_drift]
+== Recover from a Configuration Drift
+
+A _Configuration Drift_ is a term used whenever someone makes ad hoc changes in a (production) environment
+which are not recorded or tracked.
+
+In the link:{CONSOLE_URL}/k8s/ns/{STAGING_PROJECT}/configmaps[OpenShift Console^],
+`*select your '{STAGING_PROJECT}' project*` and `*click on the 'Workloads' menu and 'ConfigMaps' -> 'inventory' -> 'YAML'*`.
+
+`*Add the following line to the 'application.properties' entry of your configuration, then click on 'Save'*`
+
+[source,properties,subs="attributes+",role=copypaste]
+----
+simple.adhoc.change=This is a configuration drift
+----
+
+image::openshift-cm-inventory-drift.png[OpenShift - CM Inventory Configuration Drift,900,link=self,window=blank]
+
+In link:{ARGOCD_URL}[Argo CD^], the 'inventory' ConfigMap resource is no longer synchronized.
+`*Click on it, then select the 'Diff' tab and check 'Compact diff'*`.
+
+image::argocd-cm-inventory-diff.png[Argo CD - CM Inventory Diff,700,link=self,window=blank]
+
+Argo CD automatically detects your modification, which is not compliant with the desired state described in Git - the source of truth.
+From now on, when you want to change the configuration, you have to update the Git repository first to record and track your changes and avoid _configuration drifts_.
+
+You can leave the configuration drift as it is. You will fix it in the next lab.
+
+[#push_coolstore_configuration]
+== Push the Coolstore Configuration to the Git Repository
+
+To prepare the next lab, you need to push the remaining CoolStore application configuration to Git repositories.
+
+In your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: GitOps - Commit & Configure Coolstore'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+This task creates the Git repositories `catalog-gitops`, `gateway-gitops` and `web-gitops`, pushes the exported configuration into them,
+and creates the Argo CD Applications `catalog-{OPENSHIFT_USERNAME}`, `gateway-{OPENSHIFT_USERNAME}` and `web-{OPENSHIFT_USERNAME}` in your
+Argo CD project `{STAGING_PROJECT}`, the same way you did for the Inventory service.
+
+Once done, in your link:{GITEA_URL}/{OPENSHIFT_USERNAME}[Git Repository^], you should see the 3 new '*-gitops' repositories.
+
+image::gitea-gitops-repo.png[GitOps Repository,900,link=self,window=blank]
+
+In link:{ARGOCD_URL}[Argo CD^], you should see the 4 Applications in the **OutOfSync** state since no service has been deployed into the `{STAGING_PROJECT}` OpenShift project yet.
+
+image::argocd-outofsync-coolstore.png[Argo CD - OutOfSync Application,700,link=self,window=blank]
+
+**You are going to fix it in the next lab.**
+
+Well done! You are ready for the next lab.

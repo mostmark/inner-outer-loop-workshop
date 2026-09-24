@@ -1,0 +1,271 @@
+= Continuous Delivery with OpenShift Pipelines
+include::partial$_attributes.adoc[]
+
+_20 MINUTE EXERCISE_
+
+In this lab you will learn about deployment pipelines and you will create a pipeline to
+automate build and deployment of the Inventory service.
+
+[sidebar]
+.Continuous Delivery
+--
+So far you have been deploying each service manually to OpenShift. Although
+it's convenient for local development, it's an error-prone way of delivering software if
+extended to test and production environments.
+
+Continuous Delivery (CD) refers to a set of practices with the intention of automating
+various aspects of delivering software. One of these practices is called **Delivery Pipeline**
+which is an automated process to define the steps a change in code or configuration has
+to go through in order to reach upper environments and eventually production.
+
+OpenShift simplifies building CI/CD Pipelines by integrating Tekton into
+the platform and enables defining truly complex workflows directly from within OpenShift.
+--
+
+[#create_custom_task]
+== Create a custom Task
+
+You have learnt and understood how to create a simple **Pipeline**.
+Now, let's **create a Task to deploy the OpenShift configuration from Argo CD and add it to the existing pipeline**.
+
+[TIP]
+====
+A **Task** consists of a collection of **Steps** that are executed sequentially within a pod.
+
+Each **Step** is executed in a separate container within the same pod.
+They can also have inputs and outputs in order to interact with other tasks in the pipeline.
+====
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], make sure your project `{STAGING_PROJECT}` is selected,
+then in the header bar next to (?) `*click on '(+)' -> 'Import YAML'*`.
+
+image::openshift-import-from-yaml.png[OpenShift - Import YAML,600,link=self,window=blank]
+
+`*Then copy in the following content:*`
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: argocd-task-sync-and-wait
+  namespace: {STAGING_PROJECT}
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/tags: deploy
+    tekton.dev/displayName: "argocd"
+spec:
+  description: >-
+    As part of the Outer Loop lab this task syncs (deploys) an Argo CD application and waits for it to be healthy.
+    To do so, it requires the address of the Argo CD server and an Argo CD authentication token.
+  params:
+    - name: application-name
+      description: name of the application to sync
+      type: string
+    - name: revision
+      description: the revision to sync to
+      type: string
+      default: HEAD
+    - name: flags
+      description: additional flags for the argocd CLI
+      type: string
+      default: --plaintext
+  stepTemplate:
+    envFrom:
+      - configMapRef:
+          name: argocd-env-configmap  # used for server address (ARGOCD_SERVER)
+      - secretRef:
+          name: argocd-env-secret  # used for authentication (ARGOCD_AUTH_TOKEN)
+  steps:
+    - name: sync-and-wait
+      image: quay.io/argoproj/argocd:v3.4.7
+      script: |
+        argocd app sync $(params.application-name) --revision $(params.revision) $(params.flags)
+        argocd app wait $(params.application-name) --health $(params.flags)
+----
+
+`*Then click on 'Create'*`. Your Argo CD Task is now created.
+
+image::openshift-argocd-task.png[OpenShift - ArgoCD Task,500,link=self,window=blank]
+
+Now let's **define the Argo CD server endpoint as well as the credentials so that the Task you just created has access to the server**.
+
+In the link:{CONSOLE_URL}/k8s/ns/{STAGING_PROJECT}/configmaps[OpenShift Console^],
+`*click on the 'Workloads' menu and 'ConfigMaps', then click on the 'Create ConfigMap' button*`.
+
+image::openshift-create-configmap.png[OpenShift - Create ConfigMap,900,link=self,window=blank]
+
+Then `*switch to the 'YAML view' and replace the content*` with the following input:
+
+[source,yaml,subs="attributes+",role=copypaste]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-env-configmap
+  namespace: {STAGING_PROJECT}
+data:
+  ARGOCD_SERVER: argocd-server.argocd.svc
+----
+
+`*Click on the 'Create' button.*`
+
+For the credentials, the Task needs an Argo CD *authentication token*.
+You logged in to the Argo CD UI with your OpenShift account, which is an interactive login in the browser.
+A pipeline cannot do such a login, and storing your OpenShift password in a Secret would not be a good practice anyway.
+Therefore, an Argo CD API token has been created for you. It belongs to an Argo CD account `{OPENSHIFT_USERNAME}` that can only use the API
+(no password login) and has the same permissions as you: it can only manage the Applications of your Argo CD project `{STAGING_PROJECT}`.
+The token is stored in the Secret `argocd-env-secret` in your project.
+
+Let's inspect it. `*Click on 'Workloads' -> 'Secrets', then on the 'argocd-env-secret' secret*`.
+
+image::openshift-create-keyvalue-secret-menu.png[OpenShift - Secrets,900,link=self,window=blank]
+
+In the *Data* section, you should find the following key. `*Click on 'Reveal values'*` if you want to see the token.
+
+.ArgoCD Task Secret
+[%header,cols=2*]
+|===
+|Key
+|Value
+
+|ARGOCD_AUTH_TOKEN
+|_the Argo CD API token of your account (a JWT)_
+
+|===
+
+image::openshift-create-keyvalue-secret.png[OpenShift - ArgoCD Secret,500,link=self,window=blank]
+
+The `argocd` CLI reads the `ARGOCD_SERVER` and `ARGOCD_AUTH_TOKEN` environment variables, which the Task gets from the ConfigMap and the Secret.
+That's why the Task doesn't need an `argocd login` step.
+
+[#expand_pipeline]
+== Expand your Pipeline
+
+Now let's **expand your Inventory Pipeline to cover the Continuous Deployment**.
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^],
+`*click on 'Pipelines' -> 'Pipelines' -> 'inventory-pipeline' -> 'Actions' -> 'Edit Pipeline'*`
+
+then, `*complete your pipeline*` after the 's2i-java' task with the following two tasks and their configurations:
+
+image::openshift-full-inventory-pipeline.png[OpenShift Pipeline,900,link=self,window=blank]
+
+.ArgoCD Task Configuration
+[%header,cols=3*]
+|===
+|Section
+|Parameter
+|Value
+
+|Name
+|argocd-task-sync-and-wait
+|
+
+|Parameters
+|application-name*
+|inventory-{OPENSHIFT_USERNAME}
+
+|Parameters
+|revision
+|HEAD _(default)_
+
+|Parameters
+|flags
+|`--plaintext` _(default)_
+
+|===
+
+[NOTE]
+====
+It's important that you choose the `argocd-task-sync-and-wait` Task that you created earlier in your project, not a Red Hat one.
+====
+
+.OpenShift Client Task Configuration
+[%header,cols=3*]
+|===
+|Section
+|Parameter
+|Value
+
+|Name
+|openshift-client (Red Hat)
+|
+
+|Parameters
+|SCRIPT
+|oc rollout status deployment/inventory-coolstore
+
+|===
+
+`*Click on 'Save'*`.
+
+[#run_full_pipeline]
+== Run the Full Pipeline
+
+In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^],
+`*click on 'Pipelines' -> 'Pipelines' -> 'inventory-pipeline' -> 'Actions' -> 'Start last run'*`
+
+[TIP]
+====
+**Start last run** runs your pipeline with the same parameters and workspace configuration as the previous run, i.e. with a VolumeClaimTemplate for the shared workspace.
+====
+
+Congratulations! You have deployed your first application using OpenShift Pipelines!
+
+image::openshift-run-full-inventory-pipeline.png[OpenShift Pipeline,900,link=self,window=blank]
+
+Once finished, `*go to the 'Topology' view of your '{STAGING_PROJECT}' project*`.
+
+image::openshift-tekton-inventory-deployed.png[OpenShift - Inventory Deployed by Tekton,700,link=self,window=blank]
+
+Now, you can see that the **Inventory Service has been deployed by OpenShift Pipelines** and it is up and running.
+
+In link:{ARGOCD_URL}[Argo CD^], `*select 'Applications' in the left menu, then click on the 'inventory-{OPENSHIFT_USERNAME}' application*`:
+
+image::argocd-sync-inventory-application.png[Argo CD - Synced Application,900,link=self,window=blank]
+
+Argo CD has synchronized all the Inventory OpenShift manifests stored in your link:{GITEA_URL}/{OPENSHIFT_USERNAME}/inventory-gitops[Inventory Repository^]
+with your `{STAGING_PROJECT}` project on OpenShift. The sync also reverted the configuration drift you created in the previous lab.
+
+image::argocd-synced-inventory-details.png[Argo CD - Synced Inventory,900,link=self,window=blank]
+
+[#deploy_whole_application]
+== Deploy the whole application with Tekton
+
+Previously, for the **Inventory Service**, you have learned how to create, configure and run an OpenShift pipeline.
+Now, `*let's deploy the rest of the application*`.
+
+For doing so, in your link:{WORKSPACE_URL}[Workspace^], `*click on 'Terminal' -> 'Run Task...' -> 'devfile: Pipeline - Deploy Coolstore'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+
+Once executed, in the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^], `*click on 'Pipelines' -> 'Pipelines' -> 'coolstore-java-pipeline' -> 'PipelineRuns'*`
+
+image::openshift-coolstore-java-pipeline-run.png[OpenShift Pipeline Runs,700,link=self,window=blank]
+
+You should see 1 pipeline running for the other Java service (Catalog).
+
+`*Click on 'Pipelines' -> 'Pipelines' -> 'coolstore-dotnet-pipeline' -> 'PipelineRuns'*`
+
+image::openshift-coolstore-dotnet-pipeline-run.png[OpenShift Pipeline Runs,700,link=self,window=blank]
+
+You should see 1 pipeline running for the .NET service (Gateway).
+
+`*Click on 'Pipelines' -> 'Pipelines' -> 'coolstore-nodejs-pipeline' -> 'PipelineRuns'*`
+
+image::openshift-coolstore-nodejs-pipeline-run.png[OpenShift Pipeline Runs,700,link=self,window=blank]
+
+You should see 1 pipeline running for the Node.js service (Web).
+
+`*Click on the 'Workloads' menu and 'Topology'*` in the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^]
+and validate that the CoolStore application is deployed, up and running in the **{STAGING_PROJECT}** project.
+
+image::openshift-tekton-coolstore-deployed.png[OpenShift - Coolstore Deployed by Tekton,500,link=self,window=blank]
+
+Finally, in link:{ARGOCD_URL}[Argo CD^], all Applications are now 'Synced'.
+
+image::argocd-synced-coolstore.png[Argo CD - Synced Applications,900,link=self,window=blank]
+
+Well done! You are ready for the next lab.

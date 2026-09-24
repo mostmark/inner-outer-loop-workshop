@@ -1,0 +1,453 @@
+= Create Catalog Service with Spring Boot
+include::partial$_attributes.adoc[]
+
+_30 MINUTE EXERCISE_
+
+In this lab you will learn about Spring Boot and how you can build microservices
+using Spring Boot and JBoss technologies. During this lab, you will create a REST API for
+the Catalog service in order to provide a list of products for the CoolStore online shop.
+
+image::coolstore-arch-catalog-spring-boot.png[CoolStore Architecture,400,link=self,window=blank]
+
+[#what_is_spring_boot]
+== What is Spring Boot?
+
+[sidebar]
+--
+image::spring-boot-logo.png[Spring Boot,400,link=self,window=blank]
+
+Spring Boot is an opinionated framework that makes it easy to create stand-alone Spring based
+applications with embedded web containers such as Tomcat (or JBoss Web Server), Jetty and Undertow
+that you can run directly on the JVM using **java -jar**. Spring Boot also allows producing a war
+file that can be deployed on stand-alone web containers.
+
+The opinionated approach means many choices about Spring platform and third-party libraries
+are already made by Spring Boot so that you can get started with minimum effort and configuration.
+--
+
+[#spring_boot_maven_project]
+== Spring Boot Maven Project
+
+The **catalog-spring-boot** project has the following structure which shows the components of
+the Spring Boot project laid out in different subdirectories according to Maven best practices.
+
+For the duration of this lab you will be working in the *catalog-spring-boot* directories shown below:
+
+image::springboot-catalog-project.png[Catalog Project,400,link=self,window=blank]
+
+This is a minimal Spring Boot project with support for RESTful services and Spring Data with JPA for connecting
+to a database. This project currently contains no code other than the main class, ***CatalogApplication***
+which is there to bootstrap the Spring Boot application.
+
+`*Examine 'com.redhat.cloudnative.catalog.CatalogApplication' class*` in the **labs/catalog-spring-boot/src/main/java** directory:
+
+[source,java]
+----
+package com.redhat.cloudnative.catalog;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CatalogApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CatalogApplication.class, args);
+    }
+}
+----
+
+The database is configured using the Spring application configuration file which is located at
+**src/main/resources/application.properties**. Examine this file to see the database connection details
+and note that an in-memory H2 database is used in this lab for local development and will be replaced
+with a PostgreSQL database in the following labs. Be patient! More on that later.
+
+Let's get coding and create a domain model, data repository, and a
+RESTful endpoint to create the Catalog service:
+
+image::springboot-catalog-arch.png[Catalog RESTful Service,640,link=self,window=blank]
+
+[#create_domain_model]
+== Create the Domain Model
+
+In your link:{WORKSPACE_URL}[Workspace^], `*create the 'src/main/java/com/redhat/cloudnative/catalog/Product.java' file*`
+
+[source,java,role=copypaste]
+----
+package com.redhat.cloudnative.catalog;
+
+import java.io.Serializable;
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity // <1>
+@Table(name = "PRODUCT") // <2>
+public class Product implements Serializable {
+
+  private static final long serialVersionUID = 1L;
+
+  @Id // <3>
+  private String itemId;
+
+  private String name;
+
+  private String description;
+
+  private double price;
+
+  public Product() {
+  }
+
+  public String getItemId() {
+    return itemId;
+  }
+
+  public void setItemId(String itemId) {
+    this.itemId = itemId;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  public double getPrice() {
+    return price;
+  }
+
+  public void setPrice(double price) {
+    this.price = price;
+  }
+
+  @Override
+  public String toString() {
+    return "Product [itemId=" + itemId + ", name=" + name + ", price=" + price + "]";
+  }
+}
+----
+<1> **@Entity** marks the class as a JPA entity
+<2> **@Table** customizes the table creation process by defining a table name and database constraint
+<3> **@Id** marks the primary key for the table
+
+[#create_data_repository]
+== Create a Data Repository
+
+Spring Data repository abstraction simplifies dealing with data models in Spring applications by
+reducing the amount of boilerplate code required to implement data access layers for various
+persistence stores. https://docs.spring.io/spring-data/jpa/reference/repositories/core-concepts.html[Repository and its sub-interfaces^]
+are the central concept in Spring Data which is a marker interface to provide
+data manipulation functionality for the entity class that is being managed. When the application starts,
+Spring finds all interfaces marked as repositories and for each interface found, the infrastructure
+configures the required persistent technologies and provides an implementation for the repository interface.
+
+Create a new Java interface named **ProductRepository** in **com.redhat.cloudnative.catalog** package
+and extend https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/repository/CrudRepository.html[CrudRepository^] interface in order to indicate to Spring that you want to expose a complete set of methods to manipulate the entity.
+
+In your link:{WORKSPACE_URL}[Workspace^],
+`*create the 'src/main/java/com/redhat/cloudnative/catalog/ProductRepository.java' file*`.
+
+[source,java,role=copypaste]
+----
+package com.redhat.cloudnative.catalog;
+
+import org.springframework.data.repository.CrudRepository;
+
+public interface ProductRepository extends CrudRepository<Product, String> { // <1>
+}
+----
+<1> https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/repository/CrudRepository.html[CrudRepository^] interface
+in order to indicate to Spring that you want to expose a complete set of methods to manipulate the entity
+
+That's it! Now that you have a domain model and a repository to retrieve the domain model,
+let's create a RESTful service that returns the list of products.
+
+[#create_restful_service]
+== Create a RESTful Service
+
+Spring Boot uses Spring Web MVC as the default RESTful stack in Spring applications. Create
+a new Java class named **CatalogController** in **com.redhat.cloudnative.catalog** package.
+
+In your link:{WORKSPACE_URL}[Workspace^],
+`*create the 'src/main/java/com/redhat/cloudnative/catalog/CatalogController.java' file*`.
+
+[source,java,role=copypaste]
+----
+package com.redhat.cloudnative.catalog;
+
+import java.util.List;
+import java.util.Spliterator;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(value = "/api/catalog") // <1>
+public class CatalogController {
+
+    @Autowired // <2>
+    private ProductRepository repository; // <3>
+
+    @ResponseBody
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<Product> getAll() {
+        Spliterator<Product> products = repository.findAll().spliterator();
+        return StreamSupport.stream(products, false).collect(Collectors.toList());
+    }
+}
+----
+<1> **@RequestMapping** indicates the above REST service defines an endpoint that is accessible via **HTTP GET** at **/api/catalog**
+<2> Spring Boot automatically provides an implementation for **ProductRepository** at runtime and injects it into the
+controller using the
+https://docs.spring.io/spring-boot/reference/using/spring-beans-and-dependency-injection.html[**@Autowired**^] annotation.
+<3> the **repository** attribute on the controller class is used to retrieve the list of products from the databases.
+
+Now, let's build and package the updated **Catalog Service** using Maven.
+In your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Catalog - Build'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/catalog-spring-boot
+mvn clean package -DskipTests
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+Once done, you can conveniently run your service using **Spring Boot maven plugin** and test the endpoint.
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Catalog - Run'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/catalog-spring-boot
+mvn spring-boot:run
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+When pop-ups appear, *confirm you want to expose the 8080 port* by `*clicking on 'Open in New Tab'*`.
+
+image::che-open-9000-link.png[Che - Open Link,500,link=self,window=blank]
+
+Your browser will be directed to **your Catalog Service running inside your Workspace**.
+
+image::catalog-service.png[Catalog Service,500,link=self,window=blank]
+
+[NOTE]
+====
+If the browser shows that the preview is not available, the service has not finished starting yet. Wait a few seconds and refresh the page.
+
+image::che-preview-na.png[Che - Preview Not Available,500,link=self,window=blank]
+====
+
+Then `*click on 'Test it'*`. You should have similar output to this array of json:
+
+[source,json]
+----
+[{"itemId":"329299","name":"Red Fedora","desc":"Official Red Hat Fedora","price":34.99},...]
+----
+
+The REST API returned a JSON object representing the product list. Congratulations!
+
+[#stop_service]
+== Stop the Service
+
+In your link:{WORKSPACE_URL}[Workspace^], stop the service as follows:
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Enter Ctrl+c in the existing '>_ Catalog - Run' terminal window*`
+--
+
+CLI::
++
+--
+`*Enter Ctrl+c in the existing terminal window*`
+--
+====
+
+[#deploy_on_openshift]
+== Deploy on OpenShift
+
+It's time to deploy your service on OpenShift. This time we are going to use Eclipse https://eclipse.dev/jkube/docs/openshift-maven-plugin/[JKube^] to define the
+build and deployment process on OpenShift, but ultimately we end up using OpenShift Source-to-Image (S2I)
+to package up the .jar file into a container and run it.
+
+This time the configuration for the Catalog application is present in its *pom.xml* file for the JKube plugin.
+
+NOTE: The *pom.xml* also sets the property `jkube.build.switchToDeployment` to `true`, so JKube creates a Kubernetes `Deployment` instead of the deprecated OpenShift `DeploymentConfig`.
+
+[source,xml]
+----
+<plugin>
+  <groupId>org.eclipse.jkube</groupId>
+  <artifactId>openshift-maven-plugin</artifactId>
+  <version>1.11.0</version>
+  <configuration>
+    <source>1.8</source>
+    <target>1.8</target>
+    <enricher>
+      <config>
+        <jkube-openshift-route>
+          <generateRoute>true</generateRoute>
+        </jkube-openshift-route>
+      </config>
+    </enricher>
+    <resources>
+
+      <controller>
+        <controllerName>catalog-coolstore</controllerName>
+      </controller>
+
+      <services>
+        <service>
+        <name>catlog-coolstore</name>
+        </service>
+      </services>
+
+        <labels>
+            <all>
+                <property>
+                    <name>app.kubernetes.io/part-of</name>
+                    <value>coolstore</value>
+                </property>
+                <property>
+                    <name>component</name>
+                    <value>catalog</value>
+                </property>
+                <property>
+                    <name>app.kubernetes.io/instance</name>
+                    <value>catalog</value>
+                </property>
+            </all>
+            <deployment>
+                <property>
+                    <name>app.openshift.io/runtime</name>
+                    <value>spring</value>
+                </property>
+                <property>
+                    <name>app.kubernetes.io/name</name>
+                    <value>catalog</value>
+                </property>
+            </deployment>
+        </labels>
+    </resources>
+  </configuration>
+----
+
+As you did previously, `*Deploy a new Component to the OpenShift cluster*`
+
+As before, by watching the log output you should see this activity:
+
+* Push the jar file to OpenShift
+* Create OpenShift deployment components
+* Build a container using a Dockerfile/Containerfile
+* Push this container image to the OpenShift registry
+* Deploying the application to OpenShift
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Catalog - Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,role=copypaste]
+----
+cd /projects/workshop/labs/catalog-spring-boot
+mvn package -DskipTests oc:build oc:resource oc:apply
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+
+====
+
+Once this completes, your application should be up and running. OpenShift runs the different components of
+the application in one or more pods which are the unit of runtime deployment and consists of the running
+containers for the project.
+
+[#test_your_service]
+== Test your Service
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Open URL' icon of the Catalog Service*`
+
+image::openshift-catalog-topology.png[OpenShift - Catalog Topology,700,link=self,window=blank]
+
+Your browser will be redirected to **your Catalog Service running on OpenShift**.
+
+image::catalog-service.png[Catalog Service,500,link=self,window=blank]
+
+Then `*click on 'Test it'*`. You should have many lines of output similar to this array of json:
+
+[source,json]
+----
+[{"itemId":"329299","name":"Red Fedora","desc":"Official Red Hat Fedora","price":34.99},...]
+----
+
+Well done! You are ready to move on to the next lab.

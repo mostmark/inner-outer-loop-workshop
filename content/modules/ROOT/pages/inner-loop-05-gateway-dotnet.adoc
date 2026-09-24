@@ -1,0 +1,317 @@
+= Create Gateway Service with .NET
+include::partial$_attributes.adoc[]
+
+_15 MINUTE EXERCISE_
+
+In this lab you will learn about .NET and how you can
+build microservices using ASP.NET principles. During this lab you will
+create a scalable API Gateway that aggregates Catalog and Inventory APIs.
+
+image::coolstore-arch-gateway-dotnet.png[CoolStore Architecture,400,link=self,window=blank]
+
+[#what_is_dotnet]
+== What is .NET (previously .NET Core)?
+
+[sidebar]
+--
+image::240px-NET_Core_Logo.png[.NET,240,link=self,window=blank]
+
+https://learn.microsoft.com/en-us/dotnet/core/introduction[.NET (Core)^] is a
+free, open-source development platform for building many kinds of apps, from web, serverless, mobile, desktop and console apps.
+With .NET your code and project files look and feel the same no matter which type of app you're building and you have access to the
+same runtime, API and language capabilities with each app.
+You can create .NET apps for many operating systems, including Windows, Linux and MacOS on a variety of hardware. .NET lets
+you use platform-specific capabilities, such as operating system APIs. Examples are Windows Forms and WPF on Windows. .NET is open
+source, https://github.com/dotnet/runtime/blob/main/LICENSE.TXT[using MIT and Apache 2 licenses^]. .NET is a project of the https://dotnetfoundation.org/[.NET Foundation^].
+
+pass:[.NET] supports a number of programming languages and development environments, but today we will be looking at C# inside OpenShift Dev Spaces.
+
+We will also be using the standard web server pattern provided by ASP.NET libraries for creating non-blocking web services.
+--
+
+[#dotnet_gateway_project]
+== .NET Gateway Project
+
+The **gateway-dotnet** project has the following structure which shows the components of
+the project laid out in different subdirectories according to ASP.NET best practices:
+
+image::dotnet-gateway-project.png[Gateway Project,340,link=self,window=blank]
+
+This is a minimal ASP.NET project with support for asynchronous REST services.
+
+`*Examine 'Startup.cs' class*` in the **/projects/workshop/labs/gateway-dotnet/** directory.
+
+See how the basic web server is started with minimal services, health checks and a basic REST controller is deployed.
+
+[source,csharp]
+----
+// This method gets called by the runtime. Use this method to add services to the container.
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddCors();
+
+    services.AddControllers().AddJsonOptions(options=>
+    {
+            options.JsonSerializerOptions.IgnoreNullValues = true;
+    });
+
+    services.AddHealthChecks();
+    services.AddControllersWithViews();
+}
+
+// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+{
+
+    ProductsController.Config();
+
+    if (env.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+
+    app.UseCors(builder => builder
+            .AllowAnyOrigin ()
+            .AllowAnyHeader ()
+            .AllowAnyMethod ());
+
+    app.UseHealthChecks("/health");
+
+    app.UseRouting();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
+    app.UseEndpoints(endpoints =>
+    {
+        endpoints.MapControllers();
+        endpoints.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}");
+    });
+
+}
+----
+
+`*Examine 'ProductsController.cs' class*` in the **/projects/workshop/labs/gateway-dotnet/Controllers** directory.
+
+[source,csharp]
+----
+[ApiController]
+[Route("api/[controller]")] // <1>
+public class ProductsController : ControllerBase
+{
+    private static HttpClient catalogHttpClient = new HttpClient(); // <4>
+    private static HttpClient inventoryHttpClient = new HttpClient();
+
+    [HttpGet]
+    public IEnumerable<Products> Get()
+    {
+        try
+        {
+            // get the product list
+            IEnumerable<Products> productsList = GetCatalog(); // <2>
+
+            // update each item with their inventory value
+            foreach(Products p in productsList) // <3>
+            {
+                Inventory inv = GetInventory(p.ItemId);
+                if (inv != null)
+                    p.Availability = new Availability(inv);
+            }
+
+            return productsList;
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine("Using Catalog service: " + catalogApiHost + " and Inventory service: " + inventoryApiHost);
+            Console.WriteLine("Failure to get service data: " + e.Message);
+            // on failures return error
+            throw e;
+        }
+    }
+
+    private IEnumerable<Products> GetCatalog()
+    {
+        var data = catalogHttpClient.GetStringAsync("/api/catalog").Result;
+        return JsonConvert.DeserializeObject<IEnumerable<Products>>(data);
+    }
+
+    private Inventory GetInventory(string itemId)
+    {
+        var data = inventoryHttpClient.GetStringAsync("/api/inventory/" + itemId).Result;
+        return JsonConvert.DeserializeObject<Inventory>(data);
+    }
+
+}
+----
+<1> Not unlike the Quarkus and Spring Boot apps previously built, the ProductsController has a single defined REST entrypoint for GET */api/products*
+<2> In this case the Get() service first requests a list of products from the Catalog microservice
+<3> It then steps through each in turn to discover the amount of product in stock. It does this by calling the Inventory service for each product.
+<4> By using an HttpClient class for each service, .NET will efficiently manage the connection handling.
+
+The location or binding to the existing Catalog and Inventory REST services is determined at runtime.
+
+[#deploy_on_openshift]
+== Deploy on OpenShift
+
+It's time to build and deploy your service on OpenShift.
+
+As you did previously for the Inventory and Catalog services in the earlier chapters, you need to `*build a new Component and then Deploy it in to the OpenShift cluster*`
+
+We are still going to use OpenShift S2I, but this time we will invoke it using the OpenShift CLI (oc commands).
+We will also get S2I to compile the application, create the .NET artefact .dll and then create a container.
+
+There are two ways to get OpenShift S2I to build from source:
+
+* Point S2I at the git repo of the source code
+* Upload the source code and get S2I to build from that
+
+Since we are exploring the Inner Loop and we might have made code changes locally in the IDE we will use the "Upload" method.
+There are 4 steps here to get the Gateway service running as you can see from the log output and the CLI steps:
+
+* Create an S2I Build for the .NET application
+* Start the build by uploading the source
+* Create a new application (a deployment) in OpenShift for the application
+* Expose the application using a Route (so that we can easily test it)
+
+In your link:{WORKSPACE_URL}[Workspace^],
+
+[tabs, subs="attributes+,+macros"]
+====
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Gateway - Build and Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
+--
+
+CLI::
++
+--
+`*Execute the following commands in the terminal window*`
+
+[source,shell,subs="attributes+",role=copypaste]
+----
+cd /projects/workshop/labs/gateway-dotnet
+
+oc new-build dotnet:9.0 --name gateway-coolstore  \
+  --labels=component=gateway \
+  --env DOTNET_STARTUP_PROJECT=app.csproj --binary=true -n {DEV_PROJECT}
+oc start-build gateway-coolstore --from-dir=. -w -n {DEV_PROJECT}
+
+oc new-app gateway-coolstore:latest --name gateway-coolstore  --labels=app=coolstore,app.kubernetes.io/instance=gateway,app.kubernetes.io/part-of=coolstore,app.kubernetes.io/name=gateway,app.openshift.io/runtime=dotnet,component=gateway -n {DEV_PROJECT}
+
+oc expose svc gateway-coolstore -n {DEV_PROJECT}
+----
+
+NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+====
+
+Once this completes, your application should be up and running. OpenShift runs the different components of
+the application in one or more pods which are the unit of runtime deployment and consists of the running
+containers for the project.
+
+[#test_your_service]
+== Test your Service
+
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Open URL' icon of the Gateway Service*`
+
+image::openshift-gateway-topology.png[OpenShift - Gateway Topology,700,link=self,window=blank]
+
+Your browser will be redirected to **your Gateway Service running on OpenShift**.
+
+image::gateway-service.png[Gateway Service,500,link=self,window=blank]
+
+Then `*click on 'Test it'*`. You should have an array of json output like this but with many more products.
+
+Look in the json to see how the *Gateway service* has combined the *product* information together with the *inventory* (quantity) information:
+
+[source,json]
+----
+[{
+    "itemId": "100000",
+    "name": "Red Fedora",
+    "description": "Official Red Hat Fedora",
+    "price": 34.99,
+    "availability": {
+      "quantity": 0
+    }
+  },
+  {
+    "itemId": "329299",
+    "name": "Quarkus T-shirt",
+    "description": "This updated unisex essential fits like a well-loved favorite, featuring a crew neck, short sleeves and designed with superior combed and ring- spun cotton.",
+    "price": 10,
+    "availability": {
+      "quantity": 35
+    }
+  },
+...
+]
+----
+
+[#service_discovery]
+== Service discovery
+
+You might be wondering how the Gateway service knows how to contact the *Catalog* and *Inventory* services.
+These values can be injected as environment variables at runtime for example if running the component locally in the IDE,
+but by default we have hardcoded the name of the OpenShift *Services* and then use OpenShift local DNS to resolve these names as
+the application starts. You can see the code that consumes those variables below. This is from *ProductsController.cs class* in the
+**/projects/workshop/labs/gateway-dotnet/Controllers** directory.
+
+[source,csharp]
+----
+public static void Config()
+{
+    try
+    {
+        // discover the URL of the services we are going to call
+        catalogApiHost = "http://" +
+            GetEnvironmentVariable("COMPONENT_CATALOG_COOLSTORE_HOST",
+                "catalog-coolstore") + ":" +
+            GetEnvironmentVariable("COMPONENT_CATALOG_COOLSTORE_PORT",
+                "8080");
+
+        inventoryApiHost = "http://" +
+            GetEnvironmentVariable("COMPONENT_INVENTORY_COOLSTORE_HOST",
+                "inventory-coolstore") + ":" +
+            GetEnvironmentVariable("COMPONENT_INVENTORY_COOLSTORE_PORT",
+                "8080");
+
+        // set up the Http connection pools
+        inventoryHttpClient.BaseAddress = new Uri(inventoryApiHost);
+        catalogHttpClient.BaseAddress = new Uri(catalogApiHost);
+    }
+    catch(Exception e)
+    {
+        Console.WriteLine("Checking catalog api URL " + catalogApiHost);
+        Console.WriteLine("Checking inventory api URL " + inventoryApiHost);
+        Console.WriteLine("Failure to build location URLs for Catalog and Inventory services: " + e.Message);
+        throw;
+    }
+}
+----
+
+You can try this simple name service discovery for yourself in the Gateway service pod. In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^],
+`*select the Gateway service and then the running Pod.*`
+
+image::openshift-gateway-pod.png[Gateway Service,500,link=self,window=blank]
+
+You can test the connectivity by `*selecting the Pod Terminal*` and by `*executing these shell commands in the terminal window:*`
+
+image::openshift-gateway-pod-terminal.png[Gateway Service,500,link=self,window=blank]
+
+[source,shell,role=copypaste]
+----
+curl -w "\n" http://inventory-coolstore:8080/api/inventory/329299
+----
+
+[source,shell,role=copypaste]
+----
+curl -w "\n" http://catalog-coolstore:8080/api/catalog
+----
+
+Well done! You are ready to move on to the next lab.
