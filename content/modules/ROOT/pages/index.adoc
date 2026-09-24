@@ -66,15 +66,19 @@ Some programming experience, especially with Java, would be useful.
 |===
 | *Part* | *Duration* | *Audience* | *Level*
 
+ifeval::["{workshop-part}" != "outer"]
 |Part 1: Inner Loop
 |3.5 hours
 |Developers that want to learn OpenShift and Kubernetes
 |Beginner with OpenShift
+endif::[]
 
+ifeval::["{workshop-part}" != "inner"]
 |Part 2: Outer Loop
 |3.5 hours
 |Developers that want to learn OpenShift and Kubernetes
 |Basic experience of development and deployment on Kubernetes such as Part 1: Inner Loop
+endif::[]
 |===
 
 == Your workshop environment
@@ -97,8 +101,10 @@ Everything you need has been prepared for you on the OpenShift cluster:
 |Development project (Part 1)
 |`{DEV_PROJECT}`
 
+ifeval::["{workshop-part}" != "inner"]
 |Staging project (Part 2)
 |`{STAGING_PROJECT}`
+endif::[]
 
 |OpenShift Dev Spaces workspace
 |link:{WORKSPACE_URL}[{WORKSPACE_NAME}^]
