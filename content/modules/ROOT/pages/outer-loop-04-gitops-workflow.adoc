@@ -50,7 +50,7 @@ Exporting resources for web-coolstore...
 --- Kubernetes resources has been exported! ---
 ----
 
-This operation exports the project resources (deployment, configmap, route, secret, service)
+This operation exports the project resources (deployment, configmap, route, service, and secrets if a component has any)
 and cleans them up. As a result, you should have all resources in YAML files under
 the **/projects/workshop/labs/gitops** folder.
 
@@ -90,11 +90,10 @@ A terminal should be opened with an output similar to the following:
 ----
 Initialized empty Git repository in /projects/workshop/labs/gitops/inventory-coolstore/.git/
 [main (root-commit) 918f5d6] Initial Inventory GitOps
- 5 files changed, [...] insertions(+)
+ 4 files changed, [...] insertions(+)
  create mode 100644 configmap.yaml
  create mode 100644 deployment.yaml
  create mode 100644 route.yaml
- create mode 100644 secret.yaml
  create mode 100644 service.yaml
 [...]
 To {GITEA_INTERNAL_URL}/{OPENSHIFT_USERNAME}/inventory-gitops.git
