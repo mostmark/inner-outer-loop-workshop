@@ -759,7 +759,7 @@ I'll use common placeholder variables:
 
 **CRITICAL: DO NOT Replace Variables with Actual Values**:
 - ALWAYS keep variables as placeholders: `{OPENSHIFT_CONSOLE_URL}`
-- NEVER replace with actual values like `https://console-openshift-console.apps.cluster-abc123.abc123.example.opentlc.com`
+- NEVER replace with actual values like `https://console-openshift-console.apps.cluster-abc123.abc123.example.com`
 - Showroom will replace these at runtime with actual deployment values
 - Each deployment gets different URLs - variables MUST stay dynamic
 - Example in module content:
