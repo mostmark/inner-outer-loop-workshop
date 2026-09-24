@@ -16,6 +16,9 @@ ui:
   supplemental_files:
     - path: ./content/supplemental-ui
     - path: ./content/lib
+    # Workshop addition: derives OPENSHIFT_APPS_DOMAIN from OPENSHIFT_CONSOLE_URL in the browser.
+    - path: partials/head-scripts.hbs
+      contents: ./content/supplemental-ui/partials/head-scripts.hbs
     - path: .nojekyll
     - path: ui.yml
       contents: "static_files: [ .nojekyll ]"
