@@ -46,7 +46,7 @@ The site is generated in `www/`. Antora reads the content from the Git repositor
 
 === Per-user values
 
-Pages use the attributes `{OPENSHIFT_USERNAME}`, `{OPENSHIFT_PASSWORD}`, `{OPENSHIFT_CONSOLE_URL}` (host name) and `{OPENSHIFT_API_URL}` (host and port). The Showroom UI replaces them in the browser with the URL parameters of the same name. `{OPENSHIFT_APPS_DOMAIN}` is derived from `OPENSHIFT_CONSOLE_URL` by `content/supplemental-ui/partials/head-scripts.hbs`. Shared derived attributes (project names, service URLs) are in `content/modules/ROOT/partials/_attributes.adoc`. Do not write raw `%NAME%` placeholders in pages.
+Pages use the attributes `{OPENSHIFT_USERNAME}`, `{OPENSHIFT_PASSWORD}`, `{OPENSHIFT_CONSOLE_URL}` (host name) and `{OPENSHIFT_API_URL}` (host and port). The Showroom UI replaces them in the browser with the URL parameters of the same name. `{OPENSHIFT_APPS_DOMAIN}` is derived from `OPENSHIFT_CONSOLE_URL` by `content/supplemental-ui/partials/head-scripts.hbs`. Shared derived attributes (project names, service URLs) are in `content/modules/ROOT/partials/_attributes.adoc`. Do not write raw percent-delimited placeholders in pages; use the attributes.
 
 == Cluster preparation
 
