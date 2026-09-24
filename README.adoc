@@ -1,0 +1,87 @@
+= Inner & Outer Loop Workshop
+
+A hands-on workshop about the developer experience on Red Hat OpenShift, in two parts:
+
+* *Part 1: Inner Loop* - build and deploy the Coolstore microservices (Quarkus, Spring Boot, .NET, Node.js) from OpenShift Dev Spaces, add health probes and externalize their configuration.
+* *Part 2: Outer Loop* - push the code to Git, build it with OpenShift Pipelines, deliver it with Argo CD (GitOps), and connect and observe the services with OpenShift Service Mesh and Kiali.
+
+The content is built with Antora and published as a static site using the Red Hat Demo Platform (Showroom) UI theme.
+
+Preview the lab guide https://mostmark.github.io/inner-outer-loop-workshop?OPENSHIFT_USERNAME=user1&OPENSHIFT_PASSWORD=mypassword&OPENSHIFT_CONSOLE_URL=console-openshift-console.apps.lab.mycluster.com&OPENSHIFT_API_URL=api.lab.mycluster.com:6443[here^]
+
+Related repositories:
+
+* https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops] - provisions the cluster with OpenShift GitOps (operators, platform, per-user resources, this lab guide).
+* https://github.com/mostmark/inner-outer-loop-workshop-code[inner-outer-loop-workshop-code] - example code, devfile and tooling image used in the exercises.
+
+== Local development
+
+=== Preview with Antora viewer (recommended)
+
+To preview the workshop content locally, run the Antora viewer container:
+
+[source,sh]
+----
+podman run --rm --name antora -v $PWD:/antora -p 8080:8080 -i -t ghcr.io/juliaaano/antora-viewer
+----
+
+For SELinux environments, append `:z` to the volume mount:
+
+[source,sh]
+----
+podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 -i -t ghcr.io/juliaaano/antora-viewer
+----
+
+Then open http://localhost:8080 in your browser. When you make changes to the content, stop the container and run it again to see updates. Live-reload is not supported.
+
+Alternatively, with the Antora CLI (Node.js):
+
+[source,sh]
+----
+npm install --global @antora/cli@3.1 @antora/site-generator@3.1
+antora generate site.yml
+----
+
+The site is generated in `www/`. Antora reads the content from the Git repository, so commit your changes before building.
+
+=== Per-user values
+
+Pages use the attributes `{OPENSHIFT_USERNAME}`, `{OPENSHIFT_PASSWORD}`, `{OPENSHIFT_CONSOLE_URL}` (host name) and `{OPENSHIFT_API_URL}` (host and port). The Showroom UI replaces them in the browser with the URL parameters of the same name. `{OPENSHIFT_APPS_DOMAIN}` is derived from `OPENSHIFT_CONSOLE_URL` by `content/supplemental-ui/partials/head-scripts.hbs`. Shared derived attributes (project names, service URLs) are in `content/modules/ROOT/partials/_attributes.adoc`. Do not write raw `%NAME%` placeholders in pages.
+
+== Cluster preparation
+
+The cluster is prepared GitOps-style by https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops]:
+
+[source,sh]
+----
+export WORKSHOP_USER_PASSWORD='<password of the workshop users>'
+./bootstrap.sh --users 20
+./print-user-urls.sh
+----
+
+It installs the operators, the shared platform, the per-user resources and deploys this lab guide (image `quay.io/mostmark/inner-outer-loop-lab:latest`). Cleanup is `./cleanup.sh` in the same repository.
+
+=== Build and push a container image
+
+The `Containerfile` builds a UBI9-based container with Apache httpd that serves the pre-built workshop site on port 8080. The container runs as a non-root user and is suitable for deployment on OpenShift.
+
+To build the site content first, run the Antora viewer or the Antora CLI as described above, which generates output in the `www/` directory.
+
+Then use the `build-push-container.sh` script to build a multi-architecture image (amd64 and arm64) and push it to Quay.io:
+
+[source,sh]
+----
+export QUAY_USER=your-quay-username
+./build-push-container.sh
+----
+
+The script builds the image as `quay.io/$QUAY_USER/inner-outer-loop-lab:latest` and pushes it to the registry. The repository must be public so the cluster can pull it. You can then run the container locally:
+
+[source,sh]
+----
+podman run --rm -p 8080:8080 quay.io/$QUAY_USER/inner-outer-loop-lab:latest
+----
+
+== Screenshots
+
+Existing screenshots were kept. `SCREENSHOTS-TODO.md` lists every image that must be recaptured for OpenShift 4.22 and the current operator versions.
