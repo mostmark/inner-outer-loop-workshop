@@ -10,6 +10,9 @@ asciidoc:
     release-version: master
     page-pagination: true
     experimental: true
+    # Which part of the workshop this build contains (all, inner, outer). Set from the environment
+    # variable WORKSHOP_PART by content/lib/workshop-part-extension.js.
+    workshop-part: all
     ocp_version: "4.22"
     devspaces_version: "3.30"
     pipelines_version: "1.24"

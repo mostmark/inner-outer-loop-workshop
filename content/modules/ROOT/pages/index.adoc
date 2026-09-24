@@ -12,8 +12,18 @@ The goal of this hands-on workshop is to provide a Developer Experience through 
 To be a part of this journey, all you need is to bring your modern web browser.
 Everything else is running on the Cloud, on OpenShift.
 
+ifeval::["{workshop-part}" == "all"]
 The workshop has two parts. Part 2 builds on the application you create in Part 1.
+endif::[]
+ifeval::["{workshop-part}" == "inner"]
+This guide covers Part 1 of the workshop, the Inner Loop.
+endif::[]
+ifeval::["{workshop-part}" == "outer"]
+This guide covers Part 2 of the workshop, the Outer Loop. It builds on the application created in
+Part 1, the Inner Loop; if you did not take part in Part 1, the first lab deploys that application for you.
+endif::[]
 
+ifeval::["{workshop-part}" != "outer"]
 == Part 1: Inner Loop
 
 image::inner-loop.png[Developer Inner Loop,400,link=self,window=blank]
@@ -31,7 +41,9 @@ Discover OpenShift service resilience, scale and fault tolerance.
 Finally utilize external configuration to leverage OpenShift database access.
 
 Start with xref:inner-loop-01-introduction.adoc[Part 1: Inner Loop - Introduction].
+endif::[]
 
+ifeval::["{workshop-part}" != "inner"]
 == Part 2: Outer Loop
 
 image::outer-loop.png[Developer Outer Loop,400,link=self,window=blank]
@@ -43,6 +55,7 @@ Explore Pipelines and GitOps with Tekton and Argo CD.
 Finally use the observability of Service Mesh to monitor application network activity.
 
 Start with xref:outer-loop-01-introduction.adoc[Part 2: Outer Loop - Introduction].
+endif::[]
 
 == Audience
 

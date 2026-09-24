@@ -35,6 +35,8 @@ antora:
     - require: ./content/lib/dev-mode.js
       enabled: false
     - require: ./content/lib/preserve-url-params-extension.js
+    # Workshop addition: WORKSHOP_PART=all|inner|outer builds the whole guide or one part.
+    - require: ./content/lib/workshop-part-extension.js
 
 output:
   dir: ./www

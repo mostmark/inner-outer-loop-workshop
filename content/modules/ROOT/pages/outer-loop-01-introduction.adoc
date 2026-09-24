@@ -21,7 +21,12 @@ and how to use it for advanced deployment techniques.
 .Before you start
 ====
 Part 2 builds on the CoolStore application that you built and deployed in your Development project `{DEV_PROJECT}`
+ifeval::["{workshop-part}" == "all"]
 during xref:inner-loop-01-introduction.adoc[Part 1: Inner Loop,role='params-link'].
+endif::[]
+ifeval::["{workshop-part}" != "all"]
+during Part 1 of the workshop, the Inner Loop.
+endif::[]
 If you start the workshop with Part 2, you will deploy that application with a single command in the next lab.
 
 All you need is a modern web browser. Everything else runs on OpenShift.

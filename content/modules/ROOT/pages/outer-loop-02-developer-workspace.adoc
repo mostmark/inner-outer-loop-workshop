@@ -14,8 +14,13 @@ https://access.redhat.com/products/red-hat-openshift-dev-spaces[OpenShift Dev Sp
 It is already created for you and contains all the tools and the source code you need.
 
 * *If you completed Part 1*, keep working in the browser tab of your workspace. If you closed it, open it again with the button below.
+ifeval::["{workshop-part}" == "all"]
 * *If you start with Part 2*, open your workspace with the button below. The first start works exactly as described in
 xref:inner-loop-02-developer-workspace.adoc#get_your_developer_workspace[Part 1 - Get your Developer Workspace,role='params-link'].
+endif::[]
+ifeval::["{workshop-part}" != "all"]
+* *If you start with Part 2*, open your workspace with the button below and follow the steps after it.
+endif::[]
 
 `*Click on the 'Developer Workspace' button below*`
 
