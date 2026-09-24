@@ -44,6 +44,44 @@ antora generate site.yml
 
 The site is generated in `www/`. Antora reads the content from the Git repository, so commit your changes before building.
 
+=== One part or the whole workshop
+
+The guide can be built for the whole workshop or for one part, for events that run Part 1 and Part 2 on different days. The Antora extension `content/lib/workshop-part-extension.js` reads the environment variable `WORKSHOP_PART`:
+
+[cols="1,3"]
+|===
+|`WORKSHOP_PART` |Result
+
+|`all` (default)
+|Part 1 Inner Loop and Part 2 Outer Loop
+
+|`inner`
+|Part 1 only: the `outer-loop-*` pages and the "Part 2" navigation section are left out
+
+|`outer`
+|Part 2 only: the `inner-loop-*` pages and the "Part 1" navigation section are left out
+|===
+
+The extension also sets the AsciiDoc attribute `workshop-part`, which pages use to mention or link only what is visible, for example:
+
+[source,asciidoc]
+----
+\ifeval::["{workshop-part}" == "all"]
+See xref:inner-loop-02-developer-workspace.adoc[Part 1 - Get your Developer Workspace].
+\endif::[]
+----
+
+When you add a link from one part to the other, wrap it like this. The build fails on a link to a page that is left out, so `./build-site.sh` shows such mistakes.
+
+`./build-site.sh` builds all three variants from the committed content: `www/` (whole workshop), `www-inner/` and `www-outer/`. To preview one part with the Antora CLI:
+
+[source,sh]
+----
+WORKSHOP_PART=outer antora generate site.yml --to-dir www-outer
+----
+
+In a cluster, the part is chosen with `guidePart` / `./set-guide-part.sh` of the https://github.com/mostmark/inner-outer-loop-workshop-gitops[gitops repository]; see its README section "Running the Workshop as One Event or on Two Days".
+
 === Per-user values
 
 Pages use the attributes `{OPENSHIFT_USERNAME}`, `{OPENSHIFT_PASSWORD}`, `{OPENSHIFT_CONSOLE_URL}` (host name) and `{OPENSHIFT_API_URL}` (host and port). The Showroom UI replaces them in the browser with the URL parameters of the same name. `{OPENSHIFT_APPS_DOMAIN}` is derived from `OPENSHIFT_CONSOLE_URL` by `content/supplemental-ui/partials/head-scripts.hbs`. Shared derived attributes (project names, service URLs) are in `content/modules/ROOT/partials/_attributes.adoc`. Do not write raw percent-delimited placeholders in pages; use the attributes.
@@ -63,11 +101,9 @@ It installs the operators, the shared platform, the per-user resources and deplo
 
 === Build and push a container image
 
-The `Containerfile` builds a UBI9-based container with Apache httpd that serves the pre-built workshop site on port 8080. The container runs as a non-root user and is suitable for deployment on OpenShift.
+The `Containerfile` builds a UBI9-based container with Apache httpd that serves the pre-built workshop site on port 8080. The container runs as a non-root user and is suitable for deployment on OpenShift. It contains all three site variants (`www/`, `www-inner/`, `www-outer/`) and serves the one named by its `WORKSHOP_PART` environment variable (`all`, `inner` or `outer`; default `all`).
 
-To build the site content first, run the Antora viewer or the Antora CLI as described above, which generates output in the `www/` directory.
-
-Then use the `build-push-container.sh` script to build a multi-architecture image (amd64 and arm64) and push it to Quay.io:
+Use the `build-push-container.sh` script to build the site variants (it runs `./build-site.sh`, which needs the Antora CLI or `npx`), build a multi-architecture image (amd64 and arm64) and push it to Quay.io:
 
 [source,sh]
 ----
@@ -80,6 +116,7 @@ The script builds the image as `quay.io/$QUAY_USER/inner-outer-loop-lab:latest` 
 [source,sh]
 ----
 podman run --rm -p 8080:8080 quay.io/$QUAY_USER/inner-outer-loop-lab:latest
+podman run --rm -p 8080:8080 -e WORKSHOP_PART=inner quay.io/$QUAY_USER/inner-outer-loop-lab:latest   # Part 1 only
 ----
 
 == Screenshots
