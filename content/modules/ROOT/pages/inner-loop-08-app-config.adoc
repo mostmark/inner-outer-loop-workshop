@@ -59,7 +59,7 @@ making it simple to re-create complex deployments by just deploying a single tem
 be parameterized to get input for fields like service names and generate values for fields like passwords.
 ====
 
-In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Home' menu, and choose 'Software Catalog'*`
+In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Ecosystem' menu, and choose 'Software Catalog'*`
 and then select `*Databases*` within the catalog. We will deploy 2 databases from this list.
 
 NOTE: Depending on how the web console is configured, the *Software Catalog* may instead be found as a sub-menu of the *Ecosystem* menu item
@@ -101,7 +101,7 @@ Then, enter the following information:
 |inventorydb
 
 |Version of MariaDB Image*
-|10.5-el9
+|10.3-el8
 
 |===
 
@@ -142,7 +142,7 @@ Then, enter the following information:
 |catalogdb
 
 |Version of PostgreSQL Image*
-|15-el9
+|10-el8
 
 |===
 
@@ -205,7 +205,7 @@ the '/projects/workshop/labs/inventory-quarkus/src/main/resources/application.pr
 %prod.quarkus.datasource.db-kind=mariadb#<1>
 %prod.quarkus.kubernetes-config.enabled=true#<2>
 %prod.quarkus.kubernetes-config.config-maps=inventory#<3>
-%prod.quarkus.datasource.db-version=10.5
+%prod.quarkus.datasource.db-version=10.3
 ----
 <1> The kind of database we will connect to
 <2> If set to true, the application will attempt to look up the configuration from the API server
@@ -297,7 +297,7 @@ loaded into the database**.
 
 [source,shell,subs="attributes+",role=copypaste]
 ----
-oc rsh -n {DEV_PROJECT} deploy/inventory-mariadb
+oc rsh -n {DEV_PROJECT} deploymentconfig/inventory-mariadb
 ----
 
 Once connected to the MariaDB container, `*run the following*`:
@@ -417,7 +417,7 @@ You can also connect to the Catalog PostgreSQL database and verify that the seed
 
 [source,shell,subs="attributes+",role=copypaste]
 ----
-oc rsh -n {DEV_PROJECT} deploy/catalog-postgresql
+oc rsh -n {DEV_PROJECT} deploymentconfig/catalog-postgresql
 ----
 
 Once connected to the PostgreSQL container, run the following:
