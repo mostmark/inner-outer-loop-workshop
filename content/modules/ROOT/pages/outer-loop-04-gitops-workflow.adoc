@@ -156,9 +156,6 @@ image::argocd-configure-repositories.png[Argo CD - Configure Repositories,500,li
 |Parameter
 |Value
 
-|Type
-|git
-
 |Project
 |{STAGING_PROJECT}
 

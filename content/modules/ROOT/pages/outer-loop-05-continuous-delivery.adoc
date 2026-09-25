@@ -120,22 +120,11 @@ The token is stored in the Secret `argocd-env-secret` in your project.
 
 Let's inspect it. `*Click on 'Workloads' -> 'Secrets', then on the 'argocd-env-secret' secret*`.
 
-image::openshift-create-keyvalue-secret-menu.png[OpenShift - Secrets,900,link=self,window=blank]
+image::openshift-argocd-api-secret.png[OpenShift - Secrets,900,link=self,window=blank]
 
 In the *Data* section, you should find the following key. `*Click on 'Reveal values'*` if you want to see the token.
 
-.ArgoCD Task Secret
-[%header,cols=2*]
-|===
-|Key
-|Value
-
-|ARGOCD_AUTH_TOKEN
-|_the Argo CD API token of your account (a JWT)_
-
-|===
-
-image::openshift-create-keyvalue-secret.png[OpenShift - ArgoCD Secret,500,link=self,window=blank]
+image::openshift-argocd-api-secret-reveal.png[OpenShift - Secrets,900,link=self,window=blank]
 
 The `argocd` CLI reads the `ARGOCD_SERVER` and `ARGOCD_AUTH_TOKEN` environment variables, which the Task gets from the ConfigMap and the Secret.
 That's why the Task doesn't need an `argocd login` step.
