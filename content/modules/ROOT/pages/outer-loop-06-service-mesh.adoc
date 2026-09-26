@@ -404,7 +404,7 @@ Then, `*enter the following information:*`
 |**_Expand - see below_**
 
 |Labels
-|app.kubernetes.io/name=golang
+|app.openshift.io/runtime=golang
 
 |===
 
