@@ -194,12 +194,9 @@ It's important that you choose the `argocd-task-sync-and-wait` Task that you cre
 == Run the Full Pipeline
 
 In the link:{CONSOLE_URL}/topology/ns/{STAGING_PROJECT}[OpenShift Console^],
-`*click on 'Pipelines' -> 'Pipelines' -> 'inventory-pipeline' -> 'Actions' -> 'Start last run'*`
+`*click on 'Pipelines' -> 'Pipelines' -> 'inventory-pipeline' -> 'Actions' -> 'Start'*`
 
-[TIP]
-====
-**Start last run** runs your pipeline with the same parameters and workspace configuration as the previous run, i.e. with a VolumeClaimTemplate for the shared workspace.
-====
+Select `*VolumeClaimTemplate*` in the `*shared-workspace **` drop-down list
 
 Congratulations! You have deployed your first application using OpenShift Pipelines!
 

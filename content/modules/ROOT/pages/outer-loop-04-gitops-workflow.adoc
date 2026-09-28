@@ -148,7 +148,7 @@ In link:{ARGOCD_URL}[Argo CD^], `*select 'Settings' in the left menu, then click
 
 image::argocd-configure-repositories.png[Argo CD - Configure Repositories,500,link=self,window=blank]
 
-`*Click on '+ Connect Repo'*`, `*choose 'VIA HTTPS'*` as the connection method and enter the following:
+`*Click on '+ Connect Repo'*`, `*choose 'VIA HTTP/HTTPS'*` as the connection method and enter the following:
 
 .Repository Configuration
 [%header,cols="30%,70%"]
