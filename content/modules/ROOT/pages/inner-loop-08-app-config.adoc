@@ -62,8 +62,6 @@ be parameterized to get input for fields like service names and generate values 
 In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], `*click on the 'Ecosystem' menu, and choose 'Software Catalog'*`
 and then select `*Databases*` within the catalog. We will deploy 2 databases from this list.
 
-NOTE: Depending on how the web console is configured, the *Software Catalog* may instead be found as a sub-menu of the *Ecosystem* menu item
-
 image::openshift-add-database.png[OpenShift - Add database,800,link=self,window=blank]
 
 `*Select 'Coolstore MariaDB (Ephemeral)' and click on 'Instantiate Template'*`
@@ -512,7 +510,7 @@ the PostgreSQL database name, username and password values. These values are inj
 environment variables and used to initialize the database.
 
 In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the `*Workloads*` `*Topology*` menu,
-`*click on the '(D) catalog-postgresql' Deployment, then on its name 'catalog-postgresql' in the side panel -> 'Environment'*`. Notice the values
+`*click on the '(DC) catalog-postgresql' DeploymentConfig, then on its name 'catalog-postgresql' in the side panel -> 'Environment'*`. Notice the values
 from the secret are defined as environment variables on the deployment:
 
 image::config-psql-secret.png[Secrets as Env Vars,900,link=self,window=blank]
