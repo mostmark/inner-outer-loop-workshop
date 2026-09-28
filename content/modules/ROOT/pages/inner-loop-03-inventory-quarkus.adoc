@@ -185,14 +185,6 @@ First, in your link:{WORKSPACE_URL}[Workspace^],
 [tabs, subs="attributes+,+macros"]
 ====
 
-IDE Task::
-+
---
-`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Compile (Dev Mode)'*`
-
-image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
---
-
 CLI::
 +
 --
@@ -206,6 +198,14 @@ mvn compile quarkus:dev -Ddebug=false
 
 NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
 
+--
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Compile (Dev Mode)'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
 --
 ====
 
@@ -454,16 +454,16 @@ In your link:{WORKSPACE_URL}[Workspace^], stop the service as follows:
 [tabs, subs="attributes+,+macros"]
 ====
 
-IDE Task::
-+
---
-`*Enter Ctrl+c in the existing '>_ Inventory - Compile (Dev Mode)' terminal window*`
---
-
 CLI::
 +
 --
 `*Enter Ctrl+c in the existing terminal window*`
+--
+
+IDE Task::
++
+--
+`*Enter Ctrl+c in the existing '>_ Inventory - Compile (Dev Mode)' terminal window*`
 --
 ====
 
@@ -501,14 +501,6 @@ In your link:{WORKSPACE_URL}[Workspace^], **build** your jar file.
 [tabs, subs="attributes+,+macros"]
 ====
 
-IDE Task::
-+
---
-`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Build'*`
-
-image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
---
-
 CLI::
 +
 --
@@ -521,6 +513,14 @@ mvn clean package -DskipTests
 ----
 
 NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Build'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
 --
 ====
 
@@ -536,14 +536,6 @@ log output you should see this activity:
 [tabs, subs="attributes+,+macros"]
 ====
 
-IDE Task::
-+
---
-`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Deploy Component'*`
-
-image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
---
-
 CLI::
 +
 --
@@ -556,6 +548,14 @@ mvn package -Dquarkus.kubernetes.deploy=true -DskipTests -Dquarkus.container-ima
 ----
 
 NOTE: To open a terminal window, `*click on 'Terminal' -> 'New Terminal'*`
+--
+
+IDE Task::
++
+--
+`*Click on 'Terminal' -> 'Run Task...' -> 'devfile: Inventory - Deploy Component'*`
+
+image::che-runtask.png[Che - RunTask,600,link=self,window=blank]
 --
 ====
 
