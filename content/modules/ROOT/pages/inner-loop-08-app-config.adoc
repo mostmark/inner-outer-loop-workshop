@@ -99,7 +99,7 @@ Then, enter the following information:
 |inventorydb
 
 |Version of MariaDB Image*
-|10.3-el8
+|10.5-el9
 
 |===
 
@@ -140,7 +140,7 @@ Then, enter the following information:
 |catalogdb
 
 |Version of PostgreSQL Image*
-|10-el8
+|15-el9
 
 |===
 
