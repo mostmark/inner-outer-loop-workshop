@@ -203,11 +203,12 @@ the '/projects/workshop/labs/inventory-quarkus/src/main/resources/application.pr
 %prod.quarkus.datasource.db-kind=mariadb#<1>
 %prod.quarkus.kubernetes-config.enabled=true#<2>
 %prod.quarkus.kubernetes-config.config-maps=inventory#<3>
-%prod.quarkus.datasource.db-version=10.3
+%prod.quarkus.datasource.db-version=10.5#<4>
 ----
 <1> The kind of database we will connect to
 <2> If set to true, the application will attempt to look up the configuration from the API server
 <3> ConfigMaps to look for in the namespace that the Kubernetes Client has been configured for
+<4> The minimum database version the application expects; the *Coolstore MariaDB* template runs MariaDB 10.5
 
 NOTE: With the **%prod** prefix, this option is only activated when building the jar intended for deployments.
 
@@ -295,7 +296,7 @@ loaded into the database**.
 
 [source,shell,subs="attributes+",role=copypaste]
 ----
-oc rsh -n {DEV_PROJECT} deploymentconfig/inventory-mariadb
+oc rsh -n {DEV_PROJECT} svc/inventory-mariadb
 ----
 
 Once connected to the MariaDB container, `*run the following*`:
@@ -415,7 +416,7 @@ You can also connect to the Catalog PostgreSQL database and verify that the seed
 
 [source,shell,subs="attributes+",role=copypaste]
 ----
-oc rsh -n {DEV_PROJECT} deploymentconfig/catalog-postgresql
+oc rsh -n {DEV_PROJECT} svc/catalog-postgresql
 ----
 
 Once connected to the PostgreSQL container, run the following:
@@ -510,7 +511,7 @@ the PostgreSQL database name, username and password values. These values are inj
 environment variables and used to initialize the database.
 
 In the link:{CONSOLE_URL}/topology/ns/{DEV_PROJECT}[OpenShift Web Console^], from the `*Workloads*` `*Topology*` menu,
-`*click on the '(DC) catalog-postgresql' DeploymentConfig, then on its name 'catalog-postgresql' in the side panel -> 'Environment'*`. Notice the values
+`*click on the 'catalog-postgresql' workload, then on its name 'catalog-postgresql' in the side panel -> 'Environment'*`. Notice the values
 from the secret are defined as environment variables on the deployment:
 
 image::config-psql-secret.png[Secrets as Env Vars,900,link=self,window=blank]
