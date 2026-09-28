@@ -67,10 +67,7 @@ NOTE: The OpenShift Console also embeds Kiali views through the Service Mesh con
 
 image::developer-observability-button.png[Developer Observability - Button,300,link={KIALI_URL},window=_blank,align=center]
 
-Then, `*click on 'Log In With OpenShift'*` and, if you are asked, `*log in as {OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD}*`.
-The first time, OpenShift asks you to authorize Kiali to access your account: `*click on 'Allow selected permissions'*`.
-
-image::kiali-login.png[Kiali - Log In,300,link=self,window=blank]
+Then, `*log in as {OPENSHIFT_USERNAME}/{OPENSHIFT_PASSWORD}*`.
 
 [#enable_service_mesh]
 == Enabling Service Mesh for the Catalog, Inventory and Gateway Service
