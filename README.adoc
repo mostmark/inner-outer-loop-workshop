@@ -36,7 +36,7 @@ For SELinux environments, append `:z` to the volume mount:
 podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 -i -t ghcr.io/juliaaano/antora-viewer
 ----
 
-Then open http://localhost:8080 in your browser. When you make changes to the content, stop the container and run it again to see updates. Live-reload is not supported.
+Then open http://localhost:8080 in your browser. The viewer rebuilds the site automatically when an `.adoc`, `.yml` or `.yaml` file changes; reload the page in the browser to see the result. Adding or replacing an image (or any other file) does not trigger a rebuild: save any `.adoc` file, or restart the container, to pick it up.
 
 Alternatively, with the Antora CLI (Node.js):
 
@@ -46,7 +46,7 @@ npm install --global @antora/cli@3.1 @antora/site-generator@3.1
 antora generate site.yml
 ----
 
-The site is generated in `www/`. Antora reads the content from the Git repository, so commit your changes before building.
+The site is generated in `www/`. Antora reads the files of the checked-out branch directly, so uncommitted changes are included.
 
 === One part or the whole workshop
 
@@ -77,7 +77,7 @@ See xref:inner-loop-02-developer-workspace.adoc[Part 1 - Get your Developer Work
 
 When you add a link from one part to the other, wrap it like this. The build fails on a link to a page that is left out, so `./build-site.sh` shows such mistakes.
 
-`./build-site.sh` builds all three variants from the committed content: `www/` (whole workshop), `www-inner/` and `www-outer/`. To preview one part with the Antora CLI:
+`./build-site.sh` builds all three variants from the current working copy: `www/` (whole workshop), `www-inner/` and `www-outer/`. To preview one part with the Antora CLI:
 
 [source,sh]
 ----
