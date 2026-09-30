@@ -8,9 +8,10 @@ OpenShift Pipelines, Argo CD, Service Mesh, Kiali). It is published as the conta
 Related repositories (all use only the `main` branch):
 
 - `github.com/mostmark/inner-outer-loop-workshop-gitops`: installs the workshop on a cluster
-  (operators, platform, per-user resources, this lab guide). Owns the names and services below.
-- `github.com/mostmark/inner-outer-loop-workshop-code`: example code, devfile, devfile task scripts,
-  pipelines and the tooling image the exercises use.
+  (operators, platform, per-user resources, this lab guide), builds the participants' tooling image
+  and holds the rules for the code repository. Owns the names and services below.
+- `github.com/mostmark/inner-outer-loop-workshop-code`: example code, devfile, devfile task scripts
+  and pipelines that participants get in their workspace.
 
 ## Layout
 
@@ -118,7 +119,7 @@ Changing any of these here needs the matching change in the gitops or code repos
 ## Customising in a fork
 
 These files point to the original repositories and image; change all of them together with the
-lists in the gitops and code repositories' `CLAUDE.md`:
+lists in the gitops repository's `CLAUDE.md` (which also covers the code repository):
 
 - `site.yml`: `site.url`.
 - `content/modules/ROOT/partials/_attributes.adoc`: `CODE_REPO_URL`, `CODE_REPO_GIT_URL`.

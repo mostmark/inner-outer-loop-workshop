@@ -14,7 +14,7 @@ Preview the lab guide https://mostmark.github.io/inner-outer-loop-workshop?OPENS
 Related repositories:
 
 * https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops] - provisions the cluster with OpenShift GitOps (operators, platform, per-user resources, this lab guide).
-* https://github.com/mostmark/inner-outer-loop-workshop-code[inner-outer-loop-workshop-code] - example code, devfile and tooling image used in the exercises.
+* https://github.com/mostmark/inner-outer-loop-workshop-code[inner-outer-loop-workshop-code] - example code and devfile of the participants' workspace.
 
 To run the workshop on a cluster, see the README of https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops]. It installs everything, including this lab guide.
 
