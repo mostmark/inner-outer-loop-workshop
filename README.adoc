@@ -16,6 +16,8 @@ Related repositories:
 * https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops] - provisions the cluster with OpenShift GitOps (operators, platform, per-user resources, this lab guide).
 * https://github.com/mostmark/inner-outer-loop-workshop-code[inner-outer-loop-workshop-code] - example code, devfile and tooling image used in the exercises.
 
+To run the workshop on a cluster, see the README of https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops]. It installs everything, including this lab guide.
+
 == Local development
 
 === Preview with Antora viewer (recommended)
@@ -88,22 +90,7 @@ In a cluster, the part is chosen with `guidePart` / `./set-guide-part.sh` of the
 
 Pages use the attributes `{OPENSHIFT_USERNAME}`, `{OPENSHIFT_PASSWORD}`, `{OPENSHIFT_CONSOLE_URL}` (host name) and `{OPENSHIFT_API_URL}` (host and port). JavaScript in the Antora UI bundle (`site.yml`) replaces them in the browser with the URL parameters of the same name. `{OPENSHIFT_APPS_DOMAIN}` is derived from `OPENSHIFT_CONSOLE_URL` by `content/supplemental-ui/partials/head-scripts.hbs`. Shared derived attributes (project names, service URLs) are in `content/modules/ROOT/partials/_attributes.adoc`. Do not write raw percent-delimited placeholders in pages; use the attributes.
 
-== Cluster preparation
-
-The cluster is prepared GitOps-style by https://github.com/mostmark/inner-outer-loop-workshop-gitops[inner-outer-loop-workshop-gitops]:
-
-[source,sh]
-----
-export WORKSHOP_USER_PASSWORD='<password of the workshop users>'
-./bootstrap.sh --users 20
-./print-user-urls.sh
-----
-
-Users with different passwords: pass `--credentials-file users.csv` instead of `WORKSHOP_USER_PASSWORD` (see the "User Passwords" section of the GitOps repository's README).
-
-It installs the operators, the shared platform, the per-user resources and deploys this lab guide (image `quay.io/mostmark/inner-outer-loop-lab:latest`). Cleanup is `./cleanup.sh` in the same repository.
-
-=== Build and push a container image
+== Build and publish the lab guide image
 
 The `Containerfile` builds a UBI9-based container with Apache httpd that serves the pre-built workshop site on port 8080. The container runs as a non-root user and is suitable for deployment on OpenShift. It contains all three site variants (`www/`, `www-inner/`, `www-outer/`) and serves the one named by its `WORKSHOP_PART` environment variable (`all`, `inner` or `outer`; default `all`).
 
@@ -121,6 +108,13 @@ The script builds the image as `quay.io/$QUAY_USER/inner-outer-loop-lab:latest` 
 ----
 podman run --rm -p 8080:8080 quay.io/$QUAY_USER/inner-outer-loop-lab:latest
 podman run --rm -p 8080:8080 -e WORKSHOP_PART=inner quay.io/$QUAY_USER/inner-outer-loop-lab:latest   # Part 1 only
+----
+
+The https://github.com/mostmark/inner-outer-loop-workshop-gitops[gitops repository] deploys this image (`quay.io/mostmark/inner-outer-loop-lab:latest`) and always pulls it anew, so new installations get the latest version. On a cluster where the workshop is already running, restart the lab guide after a push:
+
+[source,sh]
+----
+oc rollout restart deployment/lab-guide -n lab-guide
 ----
 
 == Screenshots
