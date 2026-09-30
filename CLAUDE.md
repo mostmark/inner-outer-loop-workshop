@@ -36,6 +36,24 @@ Related repositories (all use only the `main` branch):
 - Publishing: `QUAY_USER=<user> ./build-push-container.sh` (needs podman). Clusters pull the image
   anew; on a running workshop restart it with `oc rollout restart deployment/lab-guide -n lab-guide`.
 
+## What you need
+
+- To write and preview: Node.js with the Antora CLI (or `npx`), or the viewer container
+  `ghcr.io/juliaaano/antora-viewer` (README, "Local development"). The viewer rebuilds on `.adoc`
+  and `.yml` changes, not on images; reload the browser yourself.
+- To publish the image: podman and a quay.io account (the repository must be public).
+- To try a change as a participant: a cluster with the workshop installed by the gitops repo
+  (cluster-admin, participant users in the identity provider), and a lab guide URL from its
+  `print-user-urls.sh`.
+
+## How changes reach users
+
+| Change | Reaches |
+|---|---|
+| push to `main` | the public GitHub Pages preview (`.github/workflows/gh-pages.yml` builds and publishes every push) |
+| `./build-push-container.sh` | new workshop installations (the image is pulled anew) |
+| image pushed + `oc rollout restart deployment/lab-guide -n lab-guide` | a workshop that is already running |
+
 ## Per-user values
 
 - Participants open the guide with URL parameters `OPENSHIFT_USERNAME`, `OPENSHIFT_PASSWORD`,
@@ -88,6 +106,27 @@ Changing any of these here needs the matching change in the gitops or code repos
   database shell with `oc rsh svc/<database>`.
 - Argo CD Applications are `<service>-<user>` (`inventory-<user>`, `catalog-<user>`, ...) in the
   AppProject `cn-project-<user>`.
+
+## Versions
+
+- `content/antora.yml` holds the product versions the text refers to (`ocp_version`,
+  `devspaces_version`, `pipelines_version`, `gitops_version`, `ossm_version`). Keep them in step with
+  the operator versions pinned in the gitops repo (its `CLAUDE.md`, "Updating versions").
+- A new product version can change the UI: check the pages and recapture screenshots that no longer
+  match (same file names).
+
+## Customising in a fork
+
+These files point to the original repositories and image; change all of them together with the
+lists in the gitops and code repositories' `CLAUDE.md`:
+
+- `site.yml`: `site.url`.
+- `content/modules/ROOT/partials/_attributes.adoc`: `CODE_REPO_URL`, `CODE_REPO_GIT_URL`.
+- The image: run `./build-push-container.sh` with your `QUAY_USER`; the gitops repo's
+  `charts/lab-guide/values.yaml` (`labGuide.image`) must name it.
+- `README.adoc` and this file: repository and image names, the GitHub Pages preview link.
+- GitHub Pages: enable it for the fork (source "GitHub Actions"), or delete
+  `.github/workflows/gh-pages.yml` if the preview must not be public.
 
 ## Git
 
