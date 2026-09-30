@@ -125,4 +125,4 @@ podman run --rm -p 8080:8080 -e WORKSHOP_PART=inner quay.io/$QUAY_USER/inner-out
 
 == Screenshots
 
-Existing screenshots were kept. `SCREENSHOTS-TODO.md` lists every image that must be recaptured for OpenShift 4.22 and the current operator versions.
+The screenshots are in `content/modules/ROOT/assets/images/` and show OpenShift 4.22 and the current operator versions. When a UI change makes one outdated, recapture it as participant `user1` and save it under the same file name, so that no page needs to change.
