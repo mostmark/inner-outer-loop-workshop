@@ -89,7 +89,7 @@ endif::[]
   file name**, so that no page needs to change. Take them as participant `user1`.
 - Blank line before and after every list.
 - Don't link to the repositories of the earlier version of this workshop; attribution is kept in the
-  gitops repo's `docs/origin.md`.
+  gitops repo's README (section "Credits") and `docs/origin.md`.
 
 ## Contracts with the other repositories
 
